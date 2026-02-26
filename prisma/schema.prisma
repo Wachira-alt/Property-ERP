@@ -1,0 +1,132 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// 1. USERS (RBAC)
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  role      Role     @default(SALES)
+  createdAt DateTime @default(now())
+  
+  // Relationships
+  assignedDeals Opportunity[] 
+  logs          AuditLog[]    
+}
+
+// 2. PROPERTIES (Inventory Control)
+model Property {
+  id          String         @id @default(uuid())
+  unitNumber  String         @unique 
+  projectName String         
+  price       Decimal        @db.Decimal(10, 2)
+  size        Float          
+  status      PropertyStatus @default(AVAILABLE)
+  
+  // Relationships
+  opportunity Opportunity?   
+}
+
+// 3. CONTACTS (Master Registry)
+model Contact {
+  id        String      @id @default(uuid())
+  firstName String
+  lastName  String
+  email     String      @unique
+  phone     String
+  type      ContactType @default(LEAD)
+  source    String?     
+  createdAt DateTime    @default(now())
+
+  // Relationships
+  opportunities Opportunity[]
+}
+
+// 4. OPPORTUNITIES (The Pipeline)
+model Opportunity {
+  id     String     @id @default(uuid())
+  status DealStage  @default(AMBER_1) 
+  
+  contactId String
+  contact   Contact @relation(fields: [contactId], references: [id])
+  
+  propertyId String   @unique 
+  property   Property @relation(fields: [propertyId], references: [id])
+  
+  agentId String
+  agent   User   @relation(fields: [agentId], references: [id])
+
+  ledger LedgerEntry[]
+  
+  createdAt DateTime @default(now())
+}
+
+// 5. LEDGER (Revenue Ops)
+model LedgerEntry {
+  id              String        @id @default(uuid())
+  opportunityId   String
+  opportunity     Opportunity   @relation(fields: [opportunityId], references: [id])
+  
+  type            TransactionType 
+  amount          Decimal         @db.Decimal(10, 2)
+  status          PaymentStatus   @default(PENDING)
+  
+  dueDate         DateTime?       
+  paidDate        DateTime?
+  
+  reference       String?         
+  createdAt       DateTime        @default(now())
+}
+
+// 6. AUDIT TRAILS
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String   
+  timestamp DateTime @default(now())
+}
+
+// ENUMS
+enum Role {
+  ADMIN
+  SALES
+  ACCOUNTS
+}
+
+enum PropertyStatus {
+  AVAILABLE
+  RESERVED
+  SOLD
+  BLOCKED
+}
+
+enum ContactType {
+  LEAD
+  ACTIVE_BUYER
+  PAST_CLIENT
+}
+
+enum DealStage {
+  GREEN    
+  AMBER_1  
+  AMBER_2  
+  RED      
+}
+
+enum TransactionType {
+  INVOICE
+  PAYMENT
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  OVERDUE
+  CANCELLED
+}
