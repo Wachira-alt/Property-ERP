@@ -1,40 +1,29 @@
 import prisma from "@/lib/prisma";
 import { AddLedgerModal } from "@/components/AddLedgerModal";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { GeneratePlanModal } from "@/components/GeneratePlanModal"; // Import the new generator
+import { LedgerActions } from "./LedgerActions"; // Import the delete action
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 
 export default async function LedgerPage() {
-  // 1. Fetch all financial records, including the client and unit details
-  // FIX: Changed from prisma.ledger to prisma.ledgerEntry
   const entries = await prisma.ledgerEntry.findMany({
-    orderBy: { createdAt: "desc" },
+    orderBy: { dueDate: "asc" }, // Sort by Due Date so we see upcoming invoices first!
     include: {
       opportunity: {
-        include: {
-          contact: true,
-          property: true,
-        }
+        include: { contact: true, property: true }
       }
     }
   });
 
-  // 2. Fetch active deals for the dropdown to link money to specific sales
   const activeDeals = await prisma.opportunity.findMany({
     include: { contact: true, property: true }
   });
 
-  // 3. Clean the deals data for the Client Component
   const cleanDeals = activeDeals.map(deal => ({
     id: deal.id,
     clientName: `${deal.contact.firstName} ${deal.contact.lastName}`,
     unit: deal.property.unitNumber,
+    price: Number(deal.property.price) // Pass the price to auto-fill the form
   }));
 
   return (
@@ -44,7 +33,11 @@ export default async function LedgerPage() {
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">Financial Ledger</h1>
           <p className="text-slate-500 mt-1">Track invoices, expected payments, and cash flow.</p>
         </div>
-        <AddLedgerModal deals={cleanDeals} />
+        <div className="flex gap-2">
+          {/* The New Generator Button */}
+          <GeneratePlanModal deals={cleanDeals} />
+          <AddLedgerModal deals={cleanDeals} />
+        </div>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -57,20 +50,23 @@ export default async function LedgerPage() {
               <TableHead>Due Date</TableHead>
               <TableHead>Ref</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {entries.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center text-slate-500">
-                  No financial records found. Click "Log Transaction" to start.
+                <TableCell colSpan={7} className="h-24 text-center text-slate-500">
+                  No financial records found. Click "Generate Plan" to auto-create invoices.
                 </TableCell>
               </TableRow>
             ) : (
               entries.map((entry) => (
                 <TableRow key={entry.id}>
                   <TableCell>
-                    <span className="font-semibold text-slate-700">{entry.type}</span>
+                    <span className={`font-semibold ${entry.type === "INVOICE" ? "text-slate-700" : "text-emerald-700"}`}>
+                      {entry.type}
+                    </span>
                   </TableCell>
                   <TableCell>
                     <div className="font-medium text-slate-900">
@@ -91,6 +87,9 @@ export default async function LedgerPage() {
                   </TableCell>
                   <TableCell>
                     <LedgerBadge status={entry.status} />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <LedgerActions entryId={entry.id} />
                   </TableCell>
                 </TableRow>
               ))
