@@ -5,43 +5,69 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 // ============================================================================
+// MODULE 0: SETUP HELPERS (PROJECTS & AGENTS)
+// ============================================================================
+
+export async function addProject(name: string, location?: string) {
+  try {
+    await prisma.project.create({ data: { name, location } });
+    revalidatePath("/properties");
+    return { success: true };
+  } catch (error) {
+    return { error: "Failed to add project. It might already exist." };
+  }
+}
+
+export async function addAgent(name: string, email: string) {
+  try {
+    await prisma.user.create({ data: { name, email, role: "SALES" } });
+    revalidatePath("/contacts");
+    return { success: true };
+  } catch (error) {
+    return { error: "Failed to add agent." };
+  }
+}
+
+// ============================================================================
 // MODULE 1: INVENTORY (PROPERTIES)
 // ============================================================================
 
 const PropertySchema = z.object({
   unitNumber: z.string().min(1, "Unit Number is required"),
-  projectName: z.string().min(1, "Project Name is required"),
-  price: z.coerce.number().min(0, "Price must be positive"),
-  size: z.coerce.number().min(0, "Size must be positive"),
+  projectId: z.string().min(1, "Project is required"),
+  cashPrice: z.coerce.number().min(0, "Cash Price must be positive"),
+  mortgagePrice: z.coerce.number().min(0, "Mortgage Price must be positive"),
   status: z.enum(["AVAILABLE", "RESERVED", "SOLD", "BLOCKED"]),
 });
 
 export async function addProperty(formData: FormData) {
   const rawData = {
     unitNumber: formData.get("unitNumber"),
-    projectName: formData.get("projectName"),
-    price: formData.get("price"),
-    size: formData.get("size"),
+    projectId: formData.get("projectId"),
+    cashPrice: formData.get("cashPrice"),
+    mortgagePrice: formData.get("mortgagePrice"),
     status: formData.get("status"),
   };
 
   const validatedData = PropertySchema.safeParse(rawData);
-  if (!validatedData.success) return { error: validatedData.error.flatten().fieldErrors };
+  if (!validatedData.success) {
+    console.error("Validation Error:", validatedData.error.flatten().fieldErrors);
+    return { error: "Validation failed. Check your inputs." };
+  }
 
   try {
     await prisma.property.create({ data: validatedData.data });
     revalidatePath("/properties");
     return { success: true };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Database Error:", error);
-    return { error: "Failed to create property. Unit number might already exist." };
+    return { error: `System Error: ${error.message || "Failed to create"}` };
   }
 }
 
 export async function deleteProperty(propertyId: string) {
   try {
-    // SAFETY CHECK: Prevent deleting properties that are linked to a deal
-    const linkedDeal = await prisma.opportunity.findUnique({ where: { propertyId: propertyId } });
+    const linkedDeal = await prisma.opportunity.findUnique({ where: { propertyId } });
     if (linkedDeal) return { error: "Cannot delete this unit. It is currently linked to an active deal." };
 
     await prisma.property.delete({ where: { id: propertyId } });
@@ -62,8 +88,8 @@ const ContactSchema = z.object({
   lastName: z.string().min(1, "Last Name is required"),
   email: z.string().email("Invalid email address"),
   phone: z.string().min(5, "Phone number is required"),
-  type: z.enum(["LEAD", "ACTIVE_BUYER", "PAST_CLIENT"]),
   source: z.string().optional(),
+  agentId: z.string().optional(), 
 });
 
 export async function addContact(formData: FormData) {
@@ -72,12 +98,15 @@ export async function addContact(formData: FormData) {
     lastName: formData.get("lastName"),
     email: formData.get("email"),
     phone: formData.get("phone"),
-    type: formData.get("type"),
-    source: formData.get("source"),
+    source: formData.get("source") || undefined,
+    agentId: formData.get("agentId") || undefined, 
   };
 
   const validatedData = ContactSchema.safeParse(rawData);
-  if (!validatedData.success) return { error: validatedData.error.flatten().fieldErrors };
+  if (!validatedData.success) {
+    console.error("Zod Validation Error:", validatedData.error.flatten().fieldErrors);
+    return { error: validatedData.error.flatten().fieldErrors };
+  }
 
   try {
     await prisma.contact.create({ data: validatedData.data });
@@ -89,21 +118,6 @@ export async function addContact(formData: FormData) {
   }
 }
 
-export async function deleteContact(contactId: string) {
-  try {
-    // SAFETY CHECK: Prevent deleting a client who has active deals
-    const linkedDeals = await prisma.opportunity.findFirst({ where: { contactId: contactId } });
-    if (linkedDeals) return { error: "Cannot delete this contact. They are linked to an existing deal." };
-
-    await prisma.contact.delete({ where: { id: contactId } });
-    revalidatePath("/contacts");
-    return { success: true };
-  } catch (error) {
-    console.error("Database Error:", error);
-    return { error: "Failed to delete contact." };
-  }
-}
-
 // ============================================================================
 // MODULE 3: THE PIPELINE (OPPORTUNITIES)
 // ============================================================================
@@ -111,7 +125,8 @@ export async function deleteContact(contactId: string) {
 const OpportunitySchema = z.object({
   contactId: z.string().min(1, "Client is required"),
   propertyId: z.string().min(1, "Property is required"),
-  status: z.enum(["GREEN", "AMBER_1", "AMBER_2", "RED"]),
+  status: z.enum(["RESERVED", "ACTIVE", "AT_RISK", "CANCELLED", "COMPLETED"]),
+  financingMethod: z.enum(["CASH", "MORTGAGE"]),
 });
 
 export async function addOpportunity(formData: FormData) {
@@ -119,6 +134,7 @@ export async function addOpportunity(formData: FormData) {
     contactId: formData.get("contactId"),
     propertyId: formData.get("propertyId"),
     status: formData.get("status"),
+    financingMethod: formData.get("financingMethod"),
   };
 
   const validatedData = OpportunitySchema.safeParse(rawData);
@@ -139,13 +155,21 @@ export async function addOpportunity(formData: FormData) {
           contactId: validatedData.data.contactId,
           propertyId: validatedData.data.propertyId,
           agentId: user.id,
-          status: validatedData.data.status,
+          status: "RESERVED", 
+          financingMethod: validatedData.data.financingMethod,
         },
       }),
       prisma.property.update({
         where: { id: validatedData.data.propertyId },
         data: { status: "RESERVED" }, 
       }),
+      // ======================================================
+      // THE WHALE FIX A: PULL THEM BACK TO "ACTIVE_BUYER"
+      // ======================================================
+      prisma.contact.update({
+        where: { id: validatedData.data.contactId },
+        data: { type: "ACTIVE_BUYER" }
+      })
     ]);
 
     revalidatePath("/opportunities");
@@ -168,10 +192,9 @@ export async function updateOpportunityStatus(opportunityId: string, newStatus: 
       data: { status: newStatus as any },
     });
 
-    // AUTOMATION: Auto-release or auto-reserve property based on Deal Status
-    if (newStatus === "RED") {
+    if (newStatus === "CANCELLED") {
       await prisma.property.update({ where: { id: deal.propertyId }, data: { status: "AVAILABLE" } });
-    } else if (deal.status === "RED" && newStatus !== "RED") {
+    } else if (deal.status === "CANCELLED" && newStatus !== "CANCELLED") {
       await prisma.property.update({ where: { id: deal.propertyId }, data: { status: "RESERVED" } });
     }
 
@@ -200,59 +223,231 @@ export async function deleteOpportunity(opportunityId: string) {
     return { success: true };
   } catch (error) {
     console.error("Database Error:", error);
-    return { error: "Cannot delete deal. It might have financial records attached to it." };
+    return { error: "Cannot delete deal." };
   }
 }
 
 // ============================================================================
-// MODULE 4: REVENUE OPS (LEDGER)
+// MODULE 4: REVENUE OPS (WATERFALL ENGINE + GUARDRAILS + AUTO-CLEAR)
 // ============================================================================
 
 const LedgerSchema = z.object({
   opportunityId: z.string().min(1, "Deal is required"),
   amount: z.coerce.number().min(0.01, "Amount must be greater than zero"),
-  type: z.enum(["INVOICE", "PAYMENT"]),
+  type: z.enum(["INVOICE", "PAYMENT", "REFUND"]), 
   status: z.enum(["PENDING", "PAID"]),
   dueDate: z.string().optional(),
   reference: z.string().optional(),
 });
 
 export async function addLedgerEntry(formData: FormData) {
-  const rawData = {
-    opportunityId: formData.get("opportunityId"),
-    amount: formData.get("amount"),
-    type: formData.get("type"),
-    status: formData.get("status"),
-    dueDate: formData.get("dueDate"),
-    reference: formData.get("reference"),
-  };
+  const opportunityId = formData.get("opportunityId") as string;
+  const rawAmount = Number(formData.get("amount"));
+  const type = formData.get("type") as "INVOICE" | "PAYMENT" | "REFUND";
+  const status = formData.get("status") as "PENDING" | "PAID";
+  
+  const dueDate = formData.get("dueDate") || undefined;
+  const reference = formData.get("reference") || undefined;
 
+  const rawData = { opportunityId, amount: rawAmount, type, status, dueDate, reference };
   const validatedData = LedgerSchema.safeParse(rawData);
-  if (!validatedData.success) return { error: validatedData.error.flatten().fieldErrors };
+  
+  if (!validatedData.success) {
+    return { error: "Validation failed. Check your inputs." };
+  }
 
   try {
-    await prisma.ledgerEntry.create({
-      data: {
-        opportunityId: validatedData.data.opportunityId,
-        type: validatedData.data.type as any, 
-        amount: validatedData.data.amount,
-        status: validatedData.data.status as any, 
-        dueDate: validatedData.data.dueDate ? new Date(validatedData.data.dueDate) : null,
-        paidDate: validatedData.data.status === "PAID" ? new Date() : null,
-        reference: validatedData.data.reference || null,
-      },
+    // ------------------------------------------------------------------------
+    // STRICT FINANCIAL GUARDRAILS
+    // ------------------------------------------------------------------------
+    const deal = await prisma.opportunity.findUnique({
+      where: { id: opportunityId },
+      include: { property: true, contact: true } 
     });
+    
+    if (!deal) return { error: "Deal not found" };
 
-    // SMART AUTOMATION: If a payment comes in, automatically upgrade deal to GREEN
-    if (validatedData.data.type === "PAYMENT" && validatedData.data.status === "PAID") {
-      await prisma.opportunity.update({
-        where: { id: validatedData.data.opportunityId },
-        data: { status: "GREEN" }
+    const allEntries = await prisma.ledgerEntry.findMany({ where: { opportunityId } });
+    
+    const totalPayments = allEntries.filter(e => e.type === "PAYMENT" && e.status === "PAID").reduce((s, e) => s + Number(e.amount), 0);
+    const totalRefunds = allEntries.filter(e => e.type === "REFUND" && e.status === "PAID").reduce((s, e) => s + Number(e.amount), 0);
+    const currentNetPaid = totalPayments - totalRefunds;
+
+    const targetPrice = deal.financingMethod === "MORTGAGE" ? Number(deal.property.mortgagePrice) : Number(deal.property.cashPrice);
+    const remainingBalance = targetPrice - currentNetPaid;
+
+    if (type === "REFUND" && rawAmount > currentNetPaid) {
+      return { error: `Strict Math Error: Client has only paid KSh ${currentNetPaid.toLocaleString()}. You cannot authorize a refund of KSh ${rawAmount.toLocaleString()}.` };
+    }
+
+    if (type === "PAYMENT") {
+      const hasInvoices = allEntries.some(e => e.type === "INVOICE");
+      if (!hasInvoices) {
+        return { error: "Accounting Lock: You must generate a Payment Plan for this deal before the system can accept payments." };
+      }
+    }
+
+    if (type === "PAYMENT" && rawAmount > remainingBalance) {
+      return { error: `Overpayment Blocked: The remaining balance for this unit is KSh ${remainingBalance.toLocaleString()}. The system cannot accept a payment of KSh ${rawAmount.toLocaleString()}.` };
+    }
+
+    // ------------------------------------------------------------------------
+    // SCENARIO 1: IT IS AN INVOICE OR A REFUND
+    // ------------------------------------------------------------------------
+    if (type === "INVOICE" || type === "REFUND") {
+      await prisma.ledgerEntry.create({
+        data: {
+          opportunityId,
+          type: type as any,
+          amount: rawAmount,
+          status: status as any,
+          dueDate: dueDate ? new Date(dueDate) : null,
+          paidDate: status === "PAID" ? new Date() : null,
+          reference: reference || null,
+        },
       });
+
+      if (type === "REFUND" && status === "PAID") {
+        const netCashAfterRefund = currentNetPaid - rawAmount;
+        if (netCashAfterRefund <= 0) {
+          await prisma.$transaction([
+            prisma.opportunity.update({ where: { id: deal.id }, data: { status: "CANCELLED" } }),
+            prisma.property.update({ where: { id: deal.propertyId }, data: { status: "AVAILABLE" } })
+          ]);
+        }
+      }
+    } 
+    
+    // ------------------------------------------------------------------------
+    // SCENARIO 2: IT IS A PAYMENT (The "Flowing" Waterfall Engine)
+    // ------------------------------------------------------------------------
+    else if (type === "PAYMENT" && status === "PAID") {
+      
+      const newTotalPaid = currentNetPaid + rawAmount;
+
+      // ======================================================================
+      // 1. ADVANCED CASH FLOW TRACING WITH EXACT RATIOS
+      // ======================================================================
+      const sortedInvoices = allEntries
+        .filter(e => e.type === "INVOICE")
+        .sort((a, b) => (a.dueDate ? new Date(a.dueDate).getTime() : 0) - (b.dueDate ? new Date(b.dueDate).getTime() : 0));
+
+      let startingCash = currentNetPaid;
+      let endingCash = currentNetPaid + rawAmount;
+      let runningTotal = 0;
+      let touchedInvoices: string[] = [];
+
+      for (const inv of sortedInvoices) {
+        const invStart = runningTotal;
+        const invAmount = Number(inv.amount);
+        const invEnd = runningTotal + invAmount;
+
+        // Did this payment "touch" this specific invoice bucket?
+        if (endingCash > invStart && startingCash < invEnd) {
+          const fullyCleared = endingCash >= invEnd;
+          const refName = inv.reference || "Installment";
+
+          if (fullyCleared) {
+            touchedInvoices.push(`${refName} Cleared`);
+          } else {
+            // Calculate exactly how much is sitting in this bucket now
+            const currentBucketFill = Math.min(Math.max(endingCash - invStart, 0), invAmount);
+            touchedInvoices.push(`Partial ${refName} (${currentBucketFill.toLocaleString()} / ${invAmount.toLocaleString()})`);
+          }
+        }
+        runningTotal = invEnd;
+      }
+
+      // Generate the Smart Reference String
+      let smartReference = "Payment";
+      if (newTotalPaid >= targetPrice) {
+        smartReference = "Final Balance Cleared";
+      } else if (touchedInvoices.length > 0) {
+        const uniqueParts = Array.from(new Set(touchedInvoices));
+        smartReference = uniqueParts.join(" + ");
+      } else {
+        smartReference = "Advance Payment";
+      }
+
+      // 2. Save the transaction with the perfect label
+      await prisma.ledgerEntry.create({
+        data: {
+          opportunityId,
+          type: "PAYMENT",
+          amount: rawAmount,
+          status: "PAID",
+          paidDate: new Date(),
+          reference: smartReference, 
+        },
+      });
+
+      // ======================================================================
+      // 3. AUTO-CLEAR PENDING INVOICES
+      // ======================================================================
+      const pendingInvoices = allEntries
+        .filter(e => e.type === "INVOICE" && e.status === "PENDING")
+        .sort((a, b) => (a.dueDate ? new Date(a.dueDate).getTime() : 0) - (b.dueDate ? new Date(b.dueDate).getTime() : 0));
+
+      const currentlyClearedInvoices = allEntries
+        .filter(e => e.type === "INVOICE" && e.status === "PAID")
+        .reduce((s, e) => s + Number(e.amount), 0);
+        
+      let availableCashToClear = newTotalPaid - currentlyClearedInvoices;
+
+      for (const inv of pendingInvoices) {
+        if (availableCashToClear >= Number(inv.amount)) {
+          await prisma.ledgerEntry.update({
+            where: { id: inv.id },
+            data: { status: "PAID", paidDate: new Date() }
+          });
+          availableCashToClear -= Number(inv.amount);
+        }
+      }
+
+      // ======================================================================
+      // 4. AUTO-UPGRADES & MULTI-PROPERTY WHALE LOGIC
+      // ======================================================================
+      const downPaymentInvoice = sortedInvoices.find(e => e.reference === "Down Payment");
+      const requiredDeposit = downPaymentInvoice ? Number(downPaymentInvoice.amount) : 0;
+
+      if (deal.contact.type === "LEAD" || deal.contact.type === "PAST_CLIENT") {
+        await prisma.contact.update({ where: { id: deal.contactId }, data: { type: "ACTIVE_BUYER" } });
+      }
+
+      if (newTotalPaid >= requiredDeposit && newTotalPaid < targetPrice && deal.status === "RESERVED") {
+        await prisma.opportunity.update({ where: { id: opportunityId }, data: { status: "ACTIVE" } });
+      }
+
+      if (newTotalPaid >= targetPrice) {
+        // Mark this specific deal and property as completed/sold
+        await prisma.$transaction([
+          prisma.opportunity.update({ where: { id: opportunityId }, data: { status: "COMPLETED" } }),
+          prisma.property.update({ where: { id: deal.propertyId }, data: { status: "SOLD" } })
+        ]);
+
+        // THE WHALE FIX B: Check if this client has ANY OTHER active properties
+        const otherActiveDeals = await prisma.opportunity.count({
+          where: { 
+            contactId: deal.contactId, 
+            status: { in: ["RESERVED", "ACTIVE", "AT_RISK"] },
+            id: { not: opportunityId } // Ignore the one we just completed
+          }
+        });
+
+        // Only move them to PAST_CLIENT if they have zero other active properties
+        if (otherActiveDeals === 0) {
+          await prisma.contact.update({ 
+            where: { id: deal.contactId }, 
+            data: { type: "PAST_CLIENT" } 
+          });
+        }
+      }
     }
 
     revalidatePath("/ledger");
     revalidatePath("/opportunities");
+    revalidatePath("/properties");
+    revalidatePath("/contacts");
     revalidatePath("/");
     return { success: true };
   } catch (error) {
@@ -260,14 +455,14 @@ export async function addLedgerEntry(formData: FormData) {
     return { error: "Failed to log financial entry." };
   }
 }
-// Add this to the bottom of src/app/actions.ts
 
+// ---> KEEPING THE PLAN GENERATOR EXACTLY AS IT WAS <---
 export async function deleteLedgerEntry(entryId: string) {
   try {
     await prisma.ledgerEntry.delete({ where: { id: entryId } });
     revalidatePath("/ledger");
-    revalidatePath("/opportunities"); // Recalculate progress bars
-    revalidatePath("/"); // Recalculate dashboard revenue
+    revalidatePath("/opportunities"); 
+    revalidatePath("/"); 
     return { success: true };
   } catch (error) {
     console.error("Database Error:", error);
@@ -275,32 +470,28 @@ export async function deleteLedgerEntry(entryId: string) {
   }
 }
 
-const PlanSchema = z.object({
-  opportunityId: z.string().min(1, "Deal is required"),
-  totalAmount: z.coerce.number().min(1),
-  deposit: z.coerce.number().min(0),
-  months: z.coerce.number().min(1).max(60),
-  startDate: z.string().min(1, "Start date is required"),
-});
-
 export async function generatePaymentPlan(formData: FormData) {
-  const rawData = {
-    opportunityId: formData.get("opportunityId"),
-    totalAmount: formData.get("totalAmount"),
-    deposit: formData.get("deposit"),
-    months: formData.get("months"),
-    startDate: formData.get("startDate"),
-  };
-
-  const val = PlanSchema.safeParse(rawData);
-  if (!val.success) return { error: val.error.flatten().fieldErrors };
-
-  const { opportunityId, totalAmount, deposit, months, startDate } = val.data;
-  const monthlyAmount = (totalAmount - deposit) / months;
-  const start = new Date(startDate);
+  const opportunityId = formData.get("opportunityId") as string;
+  const totalAmount = Number(formData.get("totalAmount"));
+  const deposit = Number(formData.get("deposit"));
+  const months = Number(formData.get("months")); 
+  const startDate = new Date(formData.get("startDate") as string);
 
   try {
-    // 1. Create the Deposit Invoice
+    const deal = await prisma.opportunity.findUnique({
+        where: { id: opportunityId }
+    });
+
+    if (!deal) return { error: "Deal not found." };
+
+    const existingPlan = await prisma.ledgerEntry.findFirst({
+      where: { opportunityId, type: "INVOICE" }
+    });
+
+    if (existingPlan) {
+      return { error: "A payment plan already exists for this deal. You cannot generate multiple plans." };
+    }
+
     if (deposit > 0) {
       await prisma.ledgerEntry.create({
         data: {
@@ -308,35 +499,121 @@ export async function generatePaymentPlan(formData: FormData) {
           type: "INVOICE",
           status: "PENDING",
           amount: deposit,
-          dueDate: start,
+          dueDate: startDate,
           reference: "Down Payment",
         },
       });
     }
 
-    // 2. Loop to create the Monthly Installments
     const invoices = [];
-    for (let i = 1; i <= months; i++) {
-      const nextDate = new Date(start);
-      nextDate.setMonth(start.getMonth() + i); // Add i months to start date
+    
+    if (deal.financingMethod === "CASH" && months > 0) {
+        const monthlyAmount = (totalAmount - deposit) / months;
+        for (let i = 1; i <= months; i++) {
+          const nextDate = new Date(startDate);
+          nextDate.setMonth(startDate.getMonth() + i); 
+    
+          invoices.push({
+            opportunityId,
+            type: "INVOICE",
+            status: "PENDING",
+            amount: monthlyAmount,
+            dueDate: nextDate,
+            // ==========================================================
+            // EXPLICIT INSTALLMENT NUMBERING
+            // ==========================================================
+            reference: `Installment ${i}`, 
+          });
+        }
+    } else if (deal.financingMethod === "MORTGAGE") {
+        const disbursementDate = new Date(startDate);
+        disbursementDate.setDate(disbursementDate.getDate() + 90);
 
-      invoices.push({
-        opportunityId,
-        type: "INVOICE",
-        status: "PENDING",
-        amount: monthlyAmount,
-        dueDate: nextDate,
-        reference: `Installment ${i}/${months}`,
-      });
+        invoices.push({
+            opportunityId,
+            type: "INVOICE",
+            status: "PENDING",
+            amount: (totalAmount - deposit),
+            dueDate: disbursementDate,
+            reference: `Mortgage Disbursement`,
+          });
     }
 
-    // Bulk insert for speed
-    await prisma.ledgerEntry.createMany({ data: invoices as any });
+    if (invoices.length > 0) {
+        await prisma.ledgerEntry.createMany({ data: invoices as any });
+    }
 
     revalidatePath("/ledger");
     return { success: true };
   } catch (error) {
     console.error("Database Error:", error);
     return { error: "Failed to generate plan." };
+  }
+}
+
+// ============================================================================
+// MODULE 5: GLOBAL SEARCH
+// ============================================================================
+
+export async function globalSearch(query: string) {
+  if (!query || query.length < 2) return { contacts: [], properties: [], deals: [] };
+
+  try {
+    const [rawContacts, rawProperties, rawDeals] = await Promise.all([
+      prisma.contact.findMany({
+        where: {
+          OR: [
+            { firstName: { contains: query, mode: "insensitive" } },
+            { lastName: { contains: query, mode: "insensitive" } },
+            { email: { contains: query, mode: "insensitive" } },
+            { phone: { contains: query, mode: "insensitive" } },
+          ]
+        },
+        take: 5
+      }),
+      
+      prisma.property.findMany({
+        where: {
+          OR: [
+            { unitNumber: { contains: query, mode: "insensitive" } },
+            { project: { name: { contains: query, mode: "insensitive" } } },
+          ]
+        },
+        include: { project: true },
+        take: 5
+      }),
+
+      prisma.opportunity.findMany({
+        where: {
+          OR: [
+            { contact: { firstName: { contains: query, mode: "insensitive" } } },
+            { contact: { lastName: { contains: query, mode: "insensitive" } } },
+            { property: { unitNumber: { contains: query, mode: "insensitive" } } },
+          ]
+        },
+        include: { contact: true, property: true },
+        take: 5
+      })
+    ]);
+
+    const properties = rawProperties.map(p => ({
+      ...p,
+      cashPrice: Number(p.cashPrice),
+      mortgagePrice: Number(p.mortgagePrice),
+    }));
+
+    const deals = rawDeals.map(d => ({
+      ...d,
+      property: {
+        ...d.property,
+        cashPrice: Number(d.property.cashPrice),
+        mortgagePrice: Number(d.property.mortgagePrice),
+      }
+    }));
+
+    return { contacts: rawContacts, properties, deals };
+  } catch (error) {
+    console.error("Search Error:", error);
+    return { contacts: [], properties: [], deals: [] };
   }
 }

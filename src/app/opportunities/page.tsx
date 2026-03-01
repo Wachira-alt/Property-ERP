@@ -2,36 +2,31 @@ import prisma from "@/lib/prisma";
 import { AddOpportunityModal } from "@/components/AddOpportunityModal";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { PipelineActions } from "./PipelineActions"; // We will create this client component next
+import { PipelineActions } from "./PipelineActions";
+import { DownloadOfferBtn } from "@/components/DownloadOfferBtn";
 
 export default async function OpportunitiesPage() {
-  const deals = await prisma.opportunity.findMany({
-    orderBy: { createdAt: "desc" },
-    include: {
-      contact: true,
-      property: true,
-      agent: true,
-      ledger: true, // We include the ledger to calculate financial progress!
-    }
-  });
-
-  const rawContacts = await prisma.contact.findMany({ orderBy: { firstName: "asc" } });
-  const rawProperties = await prisma.property.findMany({ 
-    where: { status: "AVAILABLE" },
-    orderBy: { unitNumber: "asc" } 
-  });
-
-  const cleanContacts = rawContacts.map(c => ({ id: c.id, firstName: c.firstName, lastName: c.lastName }));
-  const cleanProperties = rawProperties.map(p => ({ id: p.id, unitNumber: p.unitNumber, projectName: p.projectName }));
+  const [deals, availableContacts, availableProperties] = await Promise.all([
+    prisma.opportunity.findMany({
+      include: { 
+        contact: true, 
+        property: { include: { project: true } }, 
+        agent: true 
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.contact.findMany({ orderBy: { lastName: "asc" } }),
+    prisma.property.findMany({ where: { status: "AVAILABLE" } })
+  ]);
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">Sales Pipeline</h1>
-          <p className="text-slate-500 mt-1">Manage active deals and stage progression.</p>
+          <p className="text-slate-500 mt-1">Track active reservations and deals.</p>
         </div>
-        <AddOpportunityModal contacts={cleanContacts} properties={cleanProperties} />
+        <AddOpportunityModal contacts={availableContacts} properties={availableProperties} />
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -40,46 +35,54 @@ export default async function OpportunitiesPage() {
             <TableRow>
               <TableHead>Client</TableHead>
               <TableHead>Unit</TableHead>
-              <TableHead>Financial Progress</TableHead>
-              <TableHead>Stage</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Agreed Price</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {deals.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center text-slate-500">Pipeline is empty.</TableCell>
+                <TableCell colSpan={6} className="h-24 text-center text-slate-500">
+                  No deals found. Click "New Deal" to reserve a unit.
+                </TableCell>
               </TableRow>
             ) : (
               deals.map((deal) => {
-                // SMART MATH: Calculate total paid vs property price
-                const propertyPrice = Number(deal.property.price);
-                const totalPaid = deal.ledger
-                  .filter(l => l.type === "PAYMENT" && l.status === "PAID")
-                  .reduce((sum, l) => sum + Number(l.amount), 0);
-                const percentPaid = Math.min(Math.round((totalPaid / propertyPrice) * 100), 100);
+                const agreedPrice = deal.financingMethod === "MORTGAGE" 
+                  ? Number(deal.property.mortgagePrice) 
+                  : Number(deal.property.cashPrice);
 
                 return (
                   <TableRow key={deal.id}>
-                    <TableCell className="font-medium text-slate-900">
-                      {deal.contact.firstName} {deal.contact.lastName}
+                    <TableCell>
+                      <div className="font-medium text-slate-900">{deal.contact.firstName} {deal.contact.lastName}</div>
+                      <div className="text-xs text-slate-500">{deal.contact.phone}</div>
                     </TableCell>
                     <TableCell>
                       <div className="font-medium">{deal.property.unitNumber}</div>
-                      <div className="text-xs text-slate-500">{deal.property.projectName}</div>
+                      <div className="text-xs text-slate-500">{deal.property.project?.name || "Unassigned"}</div>
                     </TableCell>
                     <TableCell>
-                      <div className="text-sm font-medium">${totalPaid.toLocaleString()} / ${propertyPrice.toLocaleString()}</div>
-                      <div className="w-full bg-slate-100 rounded-full h-1.5 mt-2">
-                        <div className="bg-blue-600 h-1.5 rounded-full" style={{ width: `${percentPaid}%` }}></div>
+                      <Badge variant="secondary" className={deal.financingMethod === "CASH" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"}>
+                        {deal.financingMethod}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        <div className="font-bold text-slate-900">
+                          KSh {agreedPrice.toLocaleString(undefined, { minimumFractionDigits: 0 })}
+                        </div>
+                        <DownloadOfferBtn deal={deal} />
                       </div>
                     </TableCell>
                     <TableCell>
-                      <StageBadge stage={deal.status} />
+                      <PipelineBadge status={deal.status} />
                     </TableCell>
                     <TableCell className="text-right">
-                      {/* Dropdown Menu Component */}
-                      <PipelineActions dealId={deal.id} currentStatus={deal.status} />
+                      {/* Kept your original prop structure here so it doesn't break! */}
+                      <PipelineActions deal={deal} /> 
                     </TableCell>
                   </TableRow>
                 );
@@ -92,12 +95,19 @@ export default async function OpportunitiesPage() {
   );
 }
 
-function StageBadge({ stage }: { stage: string }) {
-  const styles: Record<string, string> = {
-    GREEN: "bg-emerald-100 text-emerald-800 border-emerald-200",
-    AMBER_1: "bg-amber-100 text-amber-800 border-amber-200",
-    AMBER_2: "bg-orange-100 text-orange-800 border-orange-200",
-    RED: "bg-red-100 text-red-800 border-red-200",
+// ----------------------------------------------------------------------------
+// SMART PIPELINE BADGE (Translates business logic to colors)
+// ----------------------------------------------------------------------------
+function PipelineBadge({ status }: { status: string }) {
+  const styles: Record<string, { color: string, label: string }> = {
+    ACTIVE: { color: "bg-emerald-100 text-emerald-800 border-emerald-200", label: "Active (Deposit Paid)" },
+    RESERVED: { color: "bg-amber-100 text-amber-800 border-amber-200", label: "Reserved (Awaiting Deposit)" },
+    AT_RISK: { color: "bg-orange-100 text-orange-800 border-orange-200", label: "At Risk (Overdue)" },
+    CANCELLED: { color: "bg-red-100 text-red-800 border-red-200", label: "Cancelled (Available)" },
+    COMPLETED: { color: "bg-purple-100 text-purple-800 border-purple-200", label: "Completed (Fully Paid)" },
   };
-  return <Badge variant="outline" className={styles[stage] || "bg-slate-100"}>{stage.replace("_", " ")}</Badge>;
+
+  const config = styles[status] || { color: "bg-slate-100", label: status };
+
+  return <Badge variant="outline" className={`${config.color} font-medium`}>{config.label}</Badge>;
 }
