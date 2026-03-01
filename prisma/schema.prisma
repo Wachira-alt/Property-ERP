@@ -59,6 +59,7 @@ model Contact {
   agent         User?         @relation(fields: [agentId], references: [id])
   opportunities Opportunity[]
   notes         Note[]
+  documents     Document[]
 }
 
 // 5. OPPORTUNITIES (The Pipeline)
@@ -167,9 +168,22 @@ model Campaign {
 }
 
 model Note {
-  id        String   @id @default(cuid())
-  content   String   // The actual text of the note (e.g., "Wants a corner unit")
-  contactId String
-  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
+  id          String    @id @default(cuid())
+  content     String   
+  isTask      Boolean   @default(false)
+  isCompleted Boolean   @default(false)
+  dueDate     DateTime? // <-- NEW: Schedules the follow-up
+  contactId   String
+  contact     Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+}
+
+model Document {
+  id          String   @id @default(cuid())
+  name        String   // e.g., "Client_ID.pdf"
+  fileData    String   // Stores the file itself
+  mimeType    String   // e.g., "application/pdf" or "image/png"
+  contactId   String
+  contact     Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  uploadedAt  DateTime @default(now())
 }

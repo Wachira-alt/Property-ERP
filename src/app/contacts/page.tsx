@@ -1,8 +1,9 @@
 import prisma from "@/lib/prisma";
+import Link from "next/link";
 import { AddContactModal } from "@/components/AddContactModal";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { User2, Phone, Mail } from "lucide-react";
+import { User2, Phone, Mail, ChevronRight } from "lucide-react";
 
 export default async function ContactsPage() {
   const [contacts, agents] = await Promise.all([
@@ -45,17 +46,20 @@ export default async function ContactsPage() {
               </TableRow>
             ) : (
               contacts.map((contact) => (
-                <TableRow key={contact.id}>
-                  <TableCell className="font-medium text-slate-900">
-                    {contact.firstName} {contact.lastName}
+                <TableRow key={contact.id} className="group hover:bg-slate-50 transition-colors">
+                  <TableCell className="font-bold text-slate-900">
+                    {/* FIXED: Now routes to /contacts instead of /registry */}
+                    <Link href={`/contacts/${contact.id}`} className="hover:text-blue-600 transition-colors">
+                      {contact.firstName} {contact.lastName}
+                    </Link>
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center text-xs text-slate-600">
-                        <Mail className="w-3 h-3 mr-1" /> {contact.email}
+                        <Mail className="w-3 h-3 mr-1 text-slate-400" /> {contact.email}
                       </div>
                       <div className="flex items-center text-xs text-slate-600">
-                        <Phone className="w-3 h-3 mr-1" /> {contact.phone}
+                        <Phone className="w-3 h-3 mr-1 text-slate-400" /> {contact.phone}
                       </div>
                     </div>
                   </TableCell>
@@ -68,17 +72,22 @@ export default async function ContactsPage() {
                         <span className="text-sm font-medium text-slate-700">{contact.agent.name}</span>
                       </div>
                     ) : (
-                      <span className="text-xs text-slate-400 italic">Unassigned</span>
+                      <span className="text-xs text-slate-400 italic bg-slate-100 px-2 py-1 rounded">Unassigned</span>
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="secondary" className="text-[10px] uppercase font-bold">
+                    <Badge variant="secondary" className="text-[10px] uppercase font-bold tracking-wider bg-slate-100 text-slate-600 hover:bg-slate-200">
                       {contact.type.replace("_", " ")}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    {/* Placeholder for Edit/Delete actions */}
-                    <button className="text-slate-400 hover:text-slate-600">Edit</button>
+                    {/* FIXED: Now routes to /contacts instead of /registry */}
+                    <Link 
+                      href={`/contacts/${contact.id}`} 
+                      className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-bold text-blue-700 bg-blue-50 border border-blue-100 hover:bg-blue-600 hover:text-white rounded-md transition-all opacity-0 group-hover:opacity-100"
+                    >
+                      View Profile <ChevronRight className="w-3 h-3 ml-1" />
+                    </Link>
                   </TableCell>
                 </TableRow>
               ))
