@@ -1,237 +1,175 @@
-import { prisma } from "@/lib/prisma";
-import { Users, Building2, TrendingUp, Wallet, ArrowDownRight, AlertTriangle, Activity, Banknote, Briefcase } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import Link from "next/link";
+import prisma from "@/lib/prisma";
+import { 
+  Building2, Users, Wallet, 
+  ArrowUpRight, TrendingUp, Activity, 
+  CheckCircle2, Clock, Zap 
+} from "lucide-react";
 
 export default async function DashboardPage() {
-  const now = new Date();
-
-  const [
-    totalContacts, 
-    availableProperties, 
-    allActiveDeals, 
-    paidLedgerEntries, 
-    pendingInvoices,
-    recentPayments
-  ] = await Promise.all([
-    prisma.contact.count(),
-    prisma.property.count({ where: { status: "AVAILABLE" } }),
+  // 1. Fetch Aggregated Intelligence
+  const [projects, contacts, opportunities, agents] = await Promise.all([
+    prisma.project.findMany({ 
+      include: { 
+        unitTypes: { 
+          include: { units: true } 
+        } 
+      } 
+    }),
+    prisma.contact.findMany({ 
+      include: { sourcingAgent: true } 
+    }),
     prisma.opportunity.findMany({ 
-      where: { status: { notIn: ["CANCELLED"] } },
-      include: { property: true, contact: true }
+      include: { ledgerEntries: true, unit: true } 
     }),
-    prisma.ledgerEntry.findMany({ where: { status: "PAID" } }),
-    prisma.ledgerEntry.findMany({ 
-      where: { type: "INVOICE", status: "PENDING" },
-      include: { opportunity: { include: { contact: true, property: true } } }
-    }),
-    prisma.ledgerEntry.findMany({
-      where: { type: "PAYMENT", status: "PAID" },
-      take: 5,
-      orderBy: { paidDate: "desc" },
-      include: { opportunity: { include: { contact: true, property: true } } }
+    prisma.user.findMany({ 
+      include: { 
+        sourcedContacts: { 
+          include: { opportunities: true } 
+        } 
+      } 
     })
   ]);
 
-  // 1. CASH IN BANK (Net Revenue)
-  const totalPayments = paidLedgerEntries.filter(e => e.type === "PAYMENT").reduce((s, e) => s + Number(e.amount), 0);
-  const totalRefunds = paidLedgerEntries.filter(e => e.type === "REFUND").reduce((s, e) => s + Number(e.amount), 0);
-  const netRevenue = totalPayments - totalRefunds;
-
-  // 2. EXPECTED INCOME (Accounts Receivable)
-  const expectedIncome = pendingInvoices.reduce((s, e) => s + Number(e.amount), 0);
-
-  // 3. OVERDUE CASH (Money that is late)
-  const overdueInvoices = pendingInvoices.filter(inv => inv.dueDate && new Date(inv.dueDate) < now);
-  const overdueCash = overdueInvoices.reduce((s, e) => s + Number(e.amount), 0);
-
-  // 4. PORTFOLIO HEALTH %
-  const activePipelineDeals = allActiveDeals.filter(d => ["RESERVED", "ACTIVE", "AT_RISK"].includes(d.status));
-  const overdueDealIds = new Set(overdueInvoices.map(inv => inv.opportunityId));
-  const dealsAtRiskCount = overdueDealIds.size;
-  const healthyDealsCount = activePipelineDeals.length - dealsAtRiskCount;
-  const healthPercent = activePipelineDeals.length > 0 ? Math.round((healthyDealsCount / activePipelineDeals.length) * 100) : 100;
-
-  // Total Pipeline Value
-  const totalExpectedValue = activePipelineDeals.reduce((sum, deal) => {
-    return sum + (deal.financingMethod === "MORTGAGE" ? Number(deal.property.mortgagePrice) : Number(deal.property.cashPrice));
-  }, 0);
-
-  // Group Overdue Invoices by Client for the Action Feed
-  const atRiskAccounts = Array.from(overdueDealIds).map(dealId => {
-    const dealInvoices = overdueInvoices.filter(i => i.opportunityId === dealId);
-    const deal = activePipelineDeals.find(d => d.id === dealId);
-    const totalDue = dealInvoices.reduce((s, i) => s + Number(i.amount), 0);
-    return { deal, totalDue, invoiceCount: dealInvoices.length };
-  }).filter(acc => acc.deal !== undefined);
-
+  // 2. Compute Metrics
+  const totalSalesValue = opportunities.reduce((acc, op) => acc + Number(op.agreedPrice), 0);
+  const totalClosed = opportunities.filter(op => op.status === "CLOSED").length;
+  const totalAmber = opportunities.filter(op => op.status === "RESERVED").length;
+  
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">General Manager HQ</h1>
-        <p className="text-slate-500 mt-1">Live financial and operational telemetry for your portfolio.</p>
-      </div>
-
-      {/* ROW 1: THE MONEY (Financials) */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="space-y-10 pb-20">
+      {/* HEADER */}
+      <div className="flex justify-between items-end">
+        <div>
+          <h1 className="text-5xl font-black uppercase tracking-tighter text-slate-900 leading-none">Terminal HQ</h1>
+          <div className="text-[10px] font-black uppercase tracking-[0.4em] text-blue-600 mt-4 flex items-center gap-2">
+            <Activity className="w-3 h-3" /> Real-Time Property Pilot Telemetry
+          </div>
+        </div>
         
-        <div className="bg-slate-900 p-6 rounded-xl border border-slate-800 shadow-sm flex items-center gap-4 text-white">
-          <div className="p-3 bg-emerald-500/20 text-emerald-400 rounded-lg">
-            <Wallet className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Cash Collected</p>
-            <h2 className="text-2xl font-bold text-white">KSh {(netRevenue / 1000000).toFixed(2)}M</h2>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-blue-100 text-blue-600 rounded-lg">
-            <Banknote className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Expected Income</p>
-            <h2 className="text-2xl font-bold text-slate-900">KSh {(expectedIncome / 1000000).toFixed(2)}M</h2>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl border border-red-200 shadow-sm flex items-center gap-4 relative overflow-hidden">
-          <div className="absolute right-0 top-0 bottom-0 w-2 bg-red-500"></div>
-          <div className="p-3 bg-red-100 text-red-600 rounded-lg">
-            <AlertTriangle className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-xs font-bold text-red-600 uppercase tracking-wider">Overdue Cash</p>
-            <h2 className="text-2xl font-bold text-slate-900">KSh {overdueCash.toLocaleString()}</h2>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-purple-100 text-purple-600 rounded-lg">
-            <TrendingUp className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Pipeline</p>
-            <h2 className="text-2xl font-bold text-slate-900">KSh {(totalExpectedValue / 1000000).toFixed(1)}M</h2>
+        <div className="text-right hidden md:block">
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">System Status</p>
+          {/* FIXED: Changed <p> to <div> to prevent hydration error */}
+          <div className="text-sm font-bold text-emerald-500 uppercase flex items-center gap-2 justify-end">
+            Live Feed Active 
+            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-ping" />
           </div>
         </div>
       </div>
 
-      {/* ROW 2: THE OPERATIONS */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Activity className={`w-5 h-5 ${healthPercent > 80 ? 'text-emerald-500' : 'text-amber-500'}`} />
-            <span className="text-sm font-bold text-slate-600">Pipeline Health</span>
-          </div>
-          <span className={`text-lg font-bold ${healthPercent > 80 ? 'text-emerald-600' : 'text-amber-600'}`}>{healthPercent}%</span>
-        </div>
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Briefcase className="w-5 h-5 text-blue-500" />
-            <span className="text-sm font-bold text-slate-600">Active Deals</span>
-          </div>
-          <span className="text-lg font-bold text-slate-900">{activePipelineDeals.length}</span>
-        </div>
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Building2 className="w-5 h-5 text-purple-500" />
-            <span className="text-sm font-bold text-slate-600">Units Available</span>
-          </div>
-          <span className="text-lg font-bold text-slate-900">{availableProperties}</span>
-        </div>
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Users className="w-5 h-5 text-amber-500" />
-            <span className="text-sm font-bold text-slate-600">Client Network</span>
-          </div>
-          <span className="text-lg font-bold text-slate-900">{totalContacts}</span>
-        </div>
+      {/* QUADRANT 1: THE MONEY MAP */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <StatCard title="Total Booked Value" value={`KES ${totalSalesValue.toLocaleString()}`} icon={Wallet} color="text-blue-600" />
+        <StatCard title="Active Leads (Green)" value={contacts.length} icon={Users} color="text-emerald-500" />
+        <StatCard title="Reservations (Amber)" value={totalAmber} icon={Clock} color="text-amber-500" />
+        <StatCard title="Finalized (Blue)" value={totalClosed} icon={CheckCircle2} color="text-blue-600" />
       </div>
 
-      {/* ROW 3: ACTION FEEDS */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
-        {/* Left Column: Accounts at Risk */}
-        <div className="bg-white rounded-xl border border-red-100 shadow-sm overflow-hidden flex flex-col h-full">
-          <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-red-50/30">
-            <h3 className="font-bold text-slate-900 flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-red-600" /> Accounts at Risk (Overdue)
-            </h3>
-            <Link href="/ledger" className="text-xs font-bold text-red-600 hover:text-red-700 uppercase tracking-wider">Resolve</Link>
-          </div>
-          <div className="flex-1">
-            {atRiskAccounts.length === 0 ? (
-              <div className="p-12 text-center flex flex-col items-center">
-                <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-3">
-                  <Activity className="w-6 h-6" />
-                </div>
-                <p className="text-slate-900 font-bold">Zero Overdue Accounts</p>
-                <p className="text-slate-500 text-sm mt-1">Your entire pipeline is paying on time.</p>
+        {/* QUADRANT 2: PROJECT & UNIT STATISTICS */}
+        <div className="lg:col-span-7 space-y-6">
+          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 px-2">Project Stock Absorption</h3>
+          <div className="grid grid-cols-1 gap-4">
+            {projects.length === 0 ? (
+              <div className="p-10 border-2 border-dashed border-slate-100 rounded-[2rem] text-center text-slate-300 font-black uppercase text-[10px] tracking-widest">
+                No Projects Registered
               </div>
             ) : (
-              <div className="divide-y divide-slate-100">
-                {atRiskAccounts.map((acc, idx) => (
-                  <div key={idx} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center text-red-600 font-bold text-sm uppercase">
-                        {acc.deal?.contact.firstName.charAt(0)}{acc.deal?.contact.lastName.charAt(0)}
+              projects.map(project => {
+                const allUnits = project.unitTypes.flatMap(t => t.units);
+                const soldUnits = allUnits.filter(u => u.status === "SOLD").length;
+                const percent = allUnits.length > 0 ? (soldUnits / allUnits.length) * 100 : 0;
+                
+                return (
+                  <div key={project.id} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm group hover:border-blue-200 transition-all">
+                    <div className="flex justify-between items-center mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white">
+                          <Building2 className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-black uppercase tracking-tight text-slate-900">{project.name}</p>
+                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{allUnits.length} Units in Portfolio</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-bold text-slate-900 text-sm">{acc.deal?.contact.firstName} {acc.deal?.contact.lastName}</p>
-                        <p className="text-xs text-slate-500">Unit {acc.deal?.property.unitNumber}</p>
-                      </div>
+                      <span className="text-xs font-black text-blue-600 italic tracking-tighter">{percent.toFixed(0)}% ABSORBED</span>
                     </div>
-                    <div className="text-right">
-                      <p className="font-bold text-red-600 text-sm">KSh {acc.totalDue.toLocaleString()}</p>
-                      <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">{acc.invoiceCount} Late Payments</p>
+                    <div className="h-3 w-full bg-slate-50 rounded-full overflow-hidden flex p-[2px] border border-slate-100">
+                      <div 
+                        className="h-full bg-blue-600 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(37,99,235,0.3)]" 
+                        style={{ width: `${percent}%` }} 
+                      />
                     </div>
                   </div>
-                ))}
-              </div>
+                );
+              })
             )}
           </div>
         </div>
 
-        {/* Right Column: Live Cash Feed */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-full">
-          <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-            <h3 className="font-bold text-slate-900 flex items-center gap-2">
-              <Wallet className="w-5 h-5 text-emerald-600" /> Live Cash Deposits
-            </h3>
-            <Link href="/ledger" className="text-xs font-bold text-blue-600 hover:text-blue-700 uppercase tracking-wider">View Ledger</Link>
-          </div>
-          <div className="flex-1">
-            {recentPayments.length === 0 ? (
-              <div className="p-8 text-center text-slate-500">No recent payments recorded.</div>
-            ) : (
-              <div className="divide-y divide-slate-100">
-                {recentPayments.map(payment => {
-                  const contact = payment.opportunity.contact;
+        {/* QUADRANT 3: AGENT & CONTACT STATISTICS */}
+        <div className="lg:col-span-5 space-y-6">
+          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 px-2">Agent Performance Terminal</h3>
+          <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-2xl border border-slate-800">
+            <div className="space-y-8">
+              {agents.length === 0 ? (
+                <p className="text-[9px] text-slate-500 font-black uppercase text-center py-10">Awaiting Agent Enrollment...</p>
+              ) : (
+                agents.slice(0, 5).map((agent, idx) => {
+                  const closedCount = agent.sourcedContacts.filter(c => 
+                    c.opportunities.some(o => o.status === "CLOSED")
+                  ).length;
+                  
                   return (
-                    <div key={payment.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
-                          <ArrowDownRight className="w-5 h-5" />
-                        </div>
+                    <div key={agent.id} className="flex items-center justify-between group transition-all">
+                      <div className="flex items-center gap-4">
+                        <div className="text-[10px] font-black text-slate-700 w-4">0{idx + 1}</div>
                         <div>
-                          <p className="font-bold text-slate-900 text-sm">{contact.firstName} {contact.lastName}</p>
-                          <p className="text-xs text-slate-500 line-clamp-1">{payment.reference}</p>
+                          <p className="text-xs font-black uppercase tracking-widest group-hover:text-blue-400 transition-colors">
+                            {agent.name || "Anonymous Operative"}
+                          </p>
+                          <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tight mt-1">
+                            {agent.sourcedContacts.length} Total Pipeline Contacts
+                          </p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-bold text-emerald-600 text-sm">+ KSh {Number(payment.amount).toLocaleString()}</p>
-                        <p className="text-xs text-slate-400">{new Date(payment.paidDate || payment.createdAt).toLocaleDateString()}</p>
+                        <p className="text-xs font-black text-white italic tracking-tighter">{closedCount} CLOSED</p>
+                        <div className="flex gap-1 mt-1.5 justify-end">
+                          {[...Array(Math.min(closedCount, 5))].map((_, i) => (
+                            <div key={i} className="w-1 h-1 bg-blue-500 rounded-full" />
+                          ))}
+                        </div>
                       </div>
                     </div>
                   );
-                })}
-              </div>
-            )}
+                })
+              )}
+            </div>
+            
+            <div className="mt-10 pt-6 border-t border-slate-800">
+              <button className="w-full py-4 rounded-2xl bg-slate-800 text-[9px] font-black uppercase tracking-[0.3em] text-slate-400 hover:bg-blue-600 hover:text-white transition-all border border-slate-700 hover:border-blue-500">
+                Access Full Analytics
+              </button>
+            </div>
           </div>
         </div>
-
       </div>
+    </div>
+  );
+}
+
+function StatCard({ title, value, icon: Icon, color }: any) {
+  return (
+    <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm group hover:border-blue-500 hover:shadow-xl hover:shadow-blue-900/5 transition-all cursor-default">
+      <div className="flex justify-between items-start mb-6">
+        <div className={`p-4 rounded-2xl bg-slate-50 ${color} group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm`}>
+          <Icon className="w-5 h-5" />
+        </div>
+        <ArrowUpRight className="w-4 h-4 text-slate-200 group-hover:text-blue-500 transition-colors" />
+      </div>
+      <p className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-400 mb-1">{title}</p>
+      <p className="text-2xl font-black uppercase tracking-tighter text-slate-900 italic">{value}</p>
     </div>
   );
 }

@@ -6,184 +6,168 @@ datasource db {
   provider = "postgresql"
 }
 
-// 1. PROJECTS (The Parent Registry)
-model Project {
-  id         String     @id @default(uuid())
-  name       String     @unique
-  location   String?
-  properties Property[]
-  createdAt  DateTime   @default(now())
+// --- AUTHENTICATION MODELS ---
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
 }
 
-// 2. USERS (RBAC & AGENTS)
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
 model User {
-  id            String        @id @default(uuid())
-  email         String        @unique
+  id            String    @id @default(cuid())
   name          String?
-  role          Role          @default(SALES)
-  createdAt     DateTime      @default(now())
-  
-  assignedDeals Opportunity[] 
-  contacts      Contact[]     
-  logs          AuditLog[]    
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  role          UserRole  @default(SALES)
+  accounts      Account[]
+  sessions      Session[]
+  sourcedContacts Contact[] @relation("SourcingAgent")
 }
 
-// 3. PROPERTIES (Inventory Control)
-model Property {
-  id            String         @id @default(uuid())
-  unitNumber    String         @unique 
-  
-  projectId     String         // Linked to Project Model
-  project       Project        @relation(fields: [projectId], references: [id])
-  
-  cashPrice     Decimal        @db.Decimal(10, 2)
-  mortgagePrice Decimal        @db.Decimal(10, 2)
-  status        PropertyStatus @default(AVAILABLE)
-  
-  opportunity   Opportunity?   
-}
-
-// 4. CONTACTS (Master Registry)
-model Contact {
-  id            String        @id @default(uuid())
-  firstName     String
-  lastName      String
-  email         String        @unique
-  phone         String
-  type          ContactType   @default(LEAD)
-  source        String?       
-  createdAt     DateTime      @default(now())
-  isSubscribed  Boolean       @default(true)
-
-  agentId       String?       
-  agent         User?         @relation(fields: [agentId], references: [id])
-  opportunities Opportunity[]
-  notes         Note[]
-  documents     Document[]
-}
-
-// 5. OPPORTUNITIES (The Pipeline)
-model Opportunity {
-  id              String          @id @default(uuid())
-  status          DealStage       @default(RESERVED) // UPDATED: Starts as Reserved
-  financingMethod FinancingMethod @default(CASH) 
-  
-  contactId       String
-  contact         Contact         @relation(fields: [contactId], references: [id])
-  
-  propertyId      String          @unique 
-  property        Property        @relation(fields: [propertyId], references: [id])
-  
-  agentId         String
-  agent           User            @relation(fields: [agentId], references: [id])
-
-  ledger          LedgerEntry[]
-  
-  createdAt       DateTime        @default(now())
-}
-
-// 6. LEDGER (Revenue Ops)
-model LedgerEntry {
-  id            String          @id @default(uuid())
-  opportunityId String
-  opportunity   Opportunity     @relation(fields: [opportunityId], references: [id])
-  
-  type          TransactionType 
-  amount        Decimal         @db.Decimal(10, 2)
-  status        PaymentStatus   @default(PENDING)
-  
-  dueDate       DateTime?       
-  paidDate      DateTime?
-  
-  reference     String?         
-  createdAt     DateTime        @default(now())
-}
-
-// 7. AUDIT TRAILS
-model AuditLog {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  action    String   
-  timestamp DateTime @default(now())
-}
-
-// ============================================================================
-// ENUMS (Strict Business Logic)
-// ============================================================================
-
-enum Role {
+enum UserRole {
   ADMIN
+  GENERAL_MANAGER
+  ACCOUNTANT
   SALES
-  ACCOUNTS
+  CONSTRUCTION
+  HUMAN_RESOURCE
 }
 
-enum PropertyStatus {
+// --- INVENTORY MODELS ---
+
+model Project {
+  id        String     @id @default(cuid())
+  name      String
+  location  String
+  unitTypes UnitType[]
+  contacts  Contact[]  @relation("ProjectInterest")
+  createdAt DateTime   @default(now())
+}
+
+model UnitType {
+  id        String   @id @default(cuid())
+  name      String
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  units     Unit[]
+}
+
+model Unit {
+  id             String     @id @default(cuid())
+  unitNumber     String
+  unitTypeId     String
+  unitType       UnitType   @relation(fields: [unitTypeId], references: [id], onDelete: Cascade)
+  status         UnitStatus @default(AVAILABLE)
+  completionDate DateTime?
+  holdExpiresAt  DateTime?  // 7-day timer
+  opportunities  Opportunity[]
+}
+
+enum UnitStatus {
   AVAILABLE
   RESERVED
   SOLD
-  BLOCKED
 }
 
-enum ContactType {
+// --- PIPELINE & SALES MODELS ---
+
+model Contact {
+  id                String   @id @default(cuid())
+  firstName         String
+  lastName          String
+  email             String?
+  phone             String?
+  
+  // KYC & Documents
+  idNumber          String?
+  kraPin            String?
+  idDocumentUrl     String?
+  kraDocumentUrl    String?
+  signedOfferUrl    String?
+  bookingFeeUrl     String?
+  
+  // Stage 1 & 2: Interests
+  interestedProjectId String?
+  project             Project? @relation("ProjectInterest", fields: [interestedProjectId], references: [id])
+  interestedUnitId    String?  // FIX: Added for Green Stage tracking
+  
+  // Agency
+  sourcingAgentId   String?
+  sourcingAgent     User?    @relation("SourcingAgent", fields: [sourcingAgentId], references: [id])
+
+  opportunities     Opportunity[]
+  createdAt         DateTime @default(now())
+}
+
+model Opportunity {
+  id            String            @id @default(cuid())
+  contactId     String
+  contact       Contact           @relation(fields: [contactId], references: [id])
+  unitId        String
+  unit          Unit              @relation(fields: [unitId], references: [id])
+  agreedPrice   Decimal           @db.Decimal(20, 2)
+  
+  // NEW: Store the payment method for the Offer Letter
+  paymentMethod String?           // e.g., "CASH", "MORTGAGE", "INSTALLMENTS"
+  
+  status        OpportunityStatus @default(LEAD)
+  ledgerEntries LedgerEntry[]
+  createdAt     DateTime          @default(now())
+}
+
+enum OpportunityStatus {
   LEAD
-  ACTIVE_BUYER
-  PAST_CLIENT // Triggers the Newsletter
-}
-
-enum DealStage {
-  RESERVED   // Booking fee paid, awaiting full deposit
-  ACTIVE     // Down payment secured, healthy pipeline
-  AT_RISK    // Overdue on installments
-  CANCELLED  // Deal fell through / Refunded
-  COMPLETED  // 100% Paid. Deal Closed.
-}
-
-enum TransactionType {
-  INVOICE
-  PAYMENT
-  REFUND
-}
-
-enum PaymentStatus {
-  PENDING
-  PAID
-  OVERDUE
+  RESERVED
+  CLOSED
   CANCELLED
 }
 
-enum FinancingMethod {
-  CASH
-  MORTGAGE
+model LedgerEntry {
+  id            String      @id @default(cuid())
+  opportunityId String
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  description   String?
+  amount        Decimal     @db.Decimal(20, 2)
+  dueDate       DateTime
+  paidDate      DateTime?
+  type          EntryType
+  status        EntryStatus @default(PENDING)
+  reference     String?
+  createdAt     DateTime    @default(now())
 }
 
-model Campaign {
-  id          String   @id @default(cuid())
-  subject     String
-  audience    String
-  sentCount   Int      @default(0)
-  openCount   Int      @default(0)
-  clickCount  Int      @default(0)
-  createdAt   DateTime @default(now())
+enum EntryType {
+  DEPOSIT
+  INSTALLMENT
+  PAYMENT
 }
 
-model Note {
-  id          String    @id @default(cuid())
-  content     String   
-  isTask      Boolean   @default(false)
-  isCompleted Boolean   @default(false)
-  dueDate     DateTime? // <-- NEW: Schedules the follow-up
-  contactId   String
-  contact     Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  createdAt   DateTime  @default(now())
-}
-
-model Document {
-  id          String   @id @default(cuid())
-  name        String   // e.g., "Client_ID.pdf"
-  fileData    String   // Stores the file itself
-  mimeType    String   // e.g., "application/pdf" or "image/png"
-  contactId   String
-  contact     Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  uploadedAt  DateTime @default(now())
+enum EntryStatus {
+  PENDING
+  PAID
+  OVERDUE
 }

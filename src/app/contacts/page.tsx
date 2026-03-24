@@ -2,95 +2,128 @@ import prisma from "@/lib/prisma";
 import Link from "next/link";
 import { AddContactModal } from "@/components/AddContactModal";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { User2, Phone, Mail, ChevronRight } from "lucide-react";
+import { User2, ArrowRight, Inbox } from "lucide-react";
 
 export default async function ContactsPage() {
-  const [contacts, agents] = await Promise.all([
+  const [contacts, agents, projects] = await Promise.all([
     prisma.contact.findMany({
-      include: { agent: true },
-      orderBy: { lastName: "asc" },
+      include: { 
+        sourcingAgent: true,
+        project: true,
+        opportunities: true // Crucial for Stage 2 & 3 visibility
+      },
+      orderBy: { createdAt: "desc" },
     }),
-    prisma.user.findMany({
-      where: { role: "SALES" }
+    prisma.user.findMany({ orderBy: { name: "asc" } }),
+    prisma.project.findMany({
+      include: {
+        unitTypes: {
+          include: {
+            units: { where: { status: "AVAILABLE" } }
+          }
+        }
+      },
+      orderBy: { name: "asc" }
     })
   ]);
 
   return (
     <div className="space-y-6">
+      {/* HEADER SECTION */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Master Registry</h1>
-          <p className="text-slate-500 mt-1">Manage all prospected leads and clients.</p>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight uppercase">Master Registry</h1>
+          <p className="text-sm text-slate-500 mt-1 font-bold uppercase tracking-widest">Stage 1: Floating Leads & Intake</p>
         </div>
-        <AddContactModal agents={agents} />
+        <AddContactModal agents={agents} projects={projects} />
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden min-h-[400px]">
         <Table>
-          <TableHeader className="bg-slate-50">
-            <TableRow>
-              <TableHead>Client Name</TableHead>
-              <TableHead>Contact Details</TableHead>
-              <TableHead>Assigned Agent</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+          <TableHeader className="bg-slate-50/50">
+            <TableRow className="text-[10px] uppercase font-black tracking-[0.2em] text-slate-400">
+              <TableHead className="pl-8 h-14">Client / Source</TableHead>
+              <TableHead>Target Project</TableHead>
+              <TableHead className="w-[350px]">Pipeline Progress</TableHead>
+              <TableHead className="text-right pr-8">Management</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {contacts.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center text-slate-500">
-                  No clients registered. Click "Add Client" to begin.
+                <TableCell colSpan={4} className="h-64 text-center">
+                  <div className="flex flex-col items-center justify-center space-y-3 opacity-30">
+                    <Inbox className="w-12 h-12 text-slate-400" />
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Registry Empty</p>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
-              contacts.map((contact) => (
-                <TableRow key={contact.id} className="group hover:bg-slate-50 transition-colors">
-                  <TableCell className="font-bold text-slate-900">
-                    {/* FIXED: Now routes to /contacts instead of /registry */}
-                    <Link href={`/contacts/${contact.id}`} className="hover:text-blue-600 transition-colors">
-                      {contact.firstName} {contact.lastName}
-                    </Link>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center text-xs text-slate-600">
-                        <Mail className="w-3 h-3 mr-1 text-slate-400" /> {contact.email}
+              contacts.map((contact) => {
+                const activeDeal = contact.opportunities?.[0];
+                const status = activeDeal?.status || "LEAD"; // Default is Green
+
+                return (
+                  <TableRow key={contact.id} className="group hover:bg-slate-50/80 transition-all border-b border-slate-100 last:border-0">
+                    {/* CLIENT INFO */}
+                    <TableCell className="pl-8 py-6">
+                      <div className="font-black text-slate-900 text-sm tracking-tight">
+                        {contact.firstName} {contact.lastName}
                       </div>
-                      <div className="flex items-center text-xs text-slate-600">
-                        <Phone className="w-3 h-3 mr-1 text-slate-400" /> {contact.phone}
+                      <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tight mt-1 flex items-center gap-1">
+                        <User2 className="w-3 h-3" /> Agent: {contact.sourcingAgent?.name || "Organic"}
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {contact.agent ? (
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-700">
-                          {contact.agent.name?.charAt(0)}
+                    </TableCell>
+                    
+                    {/* PROJECT INFO */}
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="text-xs font-black text-blue-600 uppercase tracking-tighter">
+                          {contact.project?.name || "Project Unassigned"}
+                        </span>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase mt-1">
+                          {contact.interestedUnitId ? `Unit Lock: Pending` : "Unit Choice: Required"}
+                        </span>
+                      </div>
+                    </TableCell>
+
+                    {/* STAGE VISUALIZER */}
+                    <TableCell>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-[9px] font-black uppercase tracking-widest px-1">
+                          <span className="text-emerald-600">Green</span>
+                          <span className={status === "RESERVED" || status === "CLOSED" ? "text-amber-500" : "text-slate-300"}>Amber</span>
+                          <span className={status === "CLOSED" ? "text-blue-600" : "text-slate-300"}>Closed</span>
                         </div>
-                        <span className="text-sm font-medium text-slate-700">{contact.agent.name}</span>
+                        <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden flex border border-slate-200/50 p-[2px]">
+                          {/* Green Segment (Always filled if lead exists) */}
+                          <div className="h-full bg-emerald-500 w-1/3 rounded-l-full border-r border-white/20" />
+                          
+                          {/* Amber Segment */}
+                          <div className={`h-full w-1/3 border-r border-white/20 transition-all duration-700 ${
+                            status === "RESERVED" || status === "CLOSED" ? 'bg-amber-400' : 'bg-transparent'
+                          }`} />
+                          
+                          {/* Closed Segment */}
+                          <div className={`h-full w-1/3 transition-all duration-700 rounded-r-full ${
+                            status === "CLOSED" ? 'bg-blue-600' : 'bg-transparent'
+                          }`} />
+                        </div>
                       </div>
-                    ) : (
-                      <span className="text-xs text-slate-400 italic bg-slate-100 px-2 py-1 rounded">Unassigned</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary" className="text-[10px] uppercase font-bold tracking-wider bg-slate-100 text-slate-600 hover:bg-slate-200">
-                      {contact.type.replace("_", " ")}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {/* FIXED: Now routes to /contacts instead of /registry */}
-                    <Link 
-                      href={`/contacts/${contact.id}`} 
-                      className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-bold text-blue-700 bg-blue-50 border border-blue-100 hover:bg-blue-600 hover:text-white rounded-md transition-all opacity-0 group-hover:opacity-100"
-                    >
-                      View Profile <ChevronRight className="w-3 h-3 ml-1" />
-                    </Link>
-                  </TableCell>
-                </TableRow>
-              ))
+                    </TableCell>
+
+                    {/* ACTION LINK */}
+                    <TableCell className="text-right pr-8">
+                      <Link 
+                        href={`/contacts/${contact.id}`} 
+                        className="inline-flex items-center gap-2 px-5 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-500 group-hover:text-white group-hover:bg-blue-600 rounded-xl transition-all border border-slate-200 group-hover:border-blue-600 shadow-sm"
+                      >
+                        Profile <ArrowRight className="w-4 h-4" />
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>

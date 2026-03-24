@@ -1,175 +1,144 @@
-import { prisma } from "@/lib/prisma";
+import prisma from "@/lib/prisma";
 import { notFound } from "next/navigation";
-import Link from "next/link";
-import { ArrowLeft, Mail, Phone, Calendar, MessageSquare, UserCircle, Briefcase, FileText, Download, UploadCloud } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { AddNoteForm } from "./AddNoteForm";
-import { TaskCheckbox } from "./TaskCheckbox";
-import { uploadDocument } from "./actions";
+import { DocumentGallery } from "./DocumentGallery";
+import { InitializeReservationForm } from "./InitializeReservationForm";
+import { ManualLedgerBuilder } from "./ManualLedgerBuilder";
+import { ClosingGate } from "./ClosingGate";
+import { OfferLetterGenerator } from "./OfferLetterGenerator";
+import { Clock, CheckCircle2, ShieldCheck, FileText } from "lucide-react";
 
-export default async function ClientProfilePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ContactProfilePage({ 
+  params 
+}: { 
+  params: Promise<{ id: string }> 
+}) {
   const { id } = await params;
 
   const contact = await prisma.contact.findUnique({
     where: { id: id },
     include: {
-      agent: true,
-      notes: { orderBy: { createdAt: "desc" } },
-      documents: { orderBy: { uploadedAt: "desc" } } // Pull the documents!
+      project: true,
+      opportunities: {
+        include: {
+          unit: { include: { unitType: true } },
+          ledgerEntries: { orderBy: { dueDate: "asc" } }
+        }
+      }
     }
   });
 
   if (!contact) notFound();
 
+  const activeDealRaw = contact.opportunities[0];
+  
+  // --- CLEAN DATA FOR CLIENT COMPONENTS ---
+  // This removes the Prisma 'Decimal' and 'Date' objects that crash React
+  const activeDeal = activeDealRaw ? {
+    ...activeDealRaw,
+    agreedPrice: Number(activeDealRaw.agreedPrice),
+    ledgerEntries: activeDealRaw.ledgerEntries.map(entry => ({
+      ...entry,
+      amount: Number(entry.amount),
+      // Ensure dueDate is a simple string for the HTML date input
+      dueDate: entry.dueDate.toISOString().split('T')[0] 
+    }))
+  } : null;
+
+  const currentStage = activeDeal?.status || "LEAD";
+  const unit = activeDeal?.unit;
+
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
-      {/* HEADER */}
-      <div className="flex items-center gap-4">
-        <Link href="/contacts" className="p-2 bg-white rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-500 transition-colors">
-          <ArrowLeft className="w-5 h-5" />
-        </Link>
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">{contact.firstName} {contact.lastName}</h1>
-          <p className="text-slate-500 mt-1">Client Profile & Activity Timeline</p>
+    <div className="max-w-7xl mx-auto space-y-8 pb-24">
+      
+      {/* 1. DYNAMIC PIPELINE HEADER */}
+      <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-2xl border border-slate-800">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <div className={`w-3 h-3 rounded-full animate-pulse ${
+                currentStage === 'LEAD' ? 'bg-emerald-500' : currentStage === 'RESERVED' ? 'bg-amber-400' : 'bg-blue-500'
+              }`} />
+              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Terminal Access / Profile</span>
+            </div>
+            <h1 className="text-4xl font-black uppercase tracking-tight italic leading-none">
+              {contact.firstName} {contact.lastName}
+            </h1>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            <div className="bg-slate-800 px-5 py-3 rounded-2xl border border-slate-700">
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1">Assigned Project</p>
+              <p className="text-sm font-bold text-blue-400 uppercase">{contact.project?.name || "Unassigned"}</p>
+            </div>
+            {unit?.holdExpiresAt && (
+              <div className="bg-amber-950/30 border border-amber-500/30 px-5 py-3 rounded-2xl">
+                <p className="text-[9px] font-black uppercase tracking-widest text-amber-500 mb-1">Amber Lock Timer</p>
+                <p className="text-sm font-bold text-amber-200 flex items-center gap-2">
+                  <Clock className="w-4 h-4" /> {new Date(unit.holdExpiresAt).toLocaleDateString()}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-10 grid grid-cols-3 gap-4">
+          {['GREEN (LEAD)', 'AMBER (RESERVED)', 'BLUE (CLOSED)'].map((label, idx) => {
+            const isPast = (idx === 0) || (idx === 1 && currentStage !== 'LEAD') || (idx === 2 && currentStage === 'CLOSED');
+            return (
+              <div key={label} className="space-y-3">
+                <div className={`h-1.5 rounded-full transition-all duration-1000 ${isPast ? 'bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]' : 'bg-slate-800'}`} />
+                <p className={`text-[9px] font-black uppercase tracking-widest ${isPast ? 'text-white' : 'text-slate-600'}`}>{label}</p>
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-        
-        {/* LEFT COLUMN: DETAILS & VAULT */}
-        <div className="space-y-6">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col items-center text-center">
-              <div className="w-20 h-20 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center text-2xl font-bold mb-4">
-                {contact.firstName.charAt(0)}{contact.lastName.charAt(0)}
-              </div>
-              <h2 className="text-xl font-bold text-slate-900">{contact.firstName} {contact.lastName}</h2>
-              <Badge variant="secondary" className="mt-2 bg-blue-50 text-blue-700 tracking-wider">
-                {contact.type.replace("_", " ")}
-              </Badge>
-            </div>
-            
-            <div className="p-6 space-y-4">
-              <div className="flex items-center gap-3 text-sm text-slate-600">
-                <Mail className="w-4 h-4 text-slate-400" />
-                <span className="font-medium text-slate-900">{contact.email}</span>
-              </div>
-              <div className="flex items-center gap-3 text-sm text-slate-600">
-                <Phone className="w-4 h-4 text-slate-400" />
-                <span className="font-medium text-slate-900">{contact.phone}</span>
-              </div>
-              <div className="flex items-center gap-3 text-sm text-slate-600">
-                <Briefcase className="w-4 h-4 text-slate-400" />
-                <span className="font-medium">Agent: <span className="text-slate-900">{contact.agent?.name || "Unassigned"}</span></span>
-              </div>
-              <div className="flex items-center gap-3 text-sm text-slate-600">
-                <Calendar className="w-4 h-4 text-slate-400" />
-                <span className="font-medium">Added: {new Date(contact.createdAt).toLocaleDateString()}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* THE NEW DOCUMENT VAULT */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-              <FileText className="w-4 h-4 text-blue-600" /> Document Vault
-            </h3>
-
-            {/* Document List */}
-            <div className="space-y-3 mb-5">
-              {contact.documents.length === 0 ? (
-                <p className="text-xs text-slate-500 italic">No files stored. Upload an ID or Contract below.</p>
-              ) : (
-                contact.documents.map(doc => (
-                  <div key={doc.id} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg hover:border-blue-300 transition-colors group">
-                    <span className="text-sm font-bold text-slate-700 truncate max-w-[180px]">{doc.name}</span>
-                    <a 
-                      href={`data:${doc.mimeType};base64,${doc.fileData}`} 
-                      download={doc.name}
-                      className="text-blue-600 hover:text-blue-800 bg-blue-50 p-2 rounded-md opacity-0 group-hover:opacity-100 transition-all"
-                      title="Download File"
-                    >
-                      <Download className="w-4 h-4" />
-                    </a>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Upload Button */}
-            <form action={uploadDocument.bind(null, contact.id)} className="flex flex-col gap-3">
-              <input 
-                type="file" 
-                name="file" 
-                required 
-                className="text-xs text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer" 
-              />
-              <button type="submit" className="bg-slate-900 text-white text-sm font-bold py-2.5 rounded-lg hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 shadow-sm">
-                <UploadCloud className="w-4 h-4" /> Save to Vault
-              </button>
-            </form>
-          </div>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div className="lg:col-span-4 space-y-6">
+          <DocumentGallery contact={contact} stage={currentStage} />
+          {currentStage === "RESERVED" && activeDeal && (
+            <ClosingGate 
+              contactId={contact.id} 
+              unitId={unit!.id} 
+              opportunityId={activeDeal.id}
+              isDocsReady={!!(contact.idDocumentUrl && contact.kraDocumentUrl && contact.signedOfferUrl && contact.bookingFeeUrl)}
+            />
+          )}
         </div>
 
-        {/* RIGHT COLUMN: ACTIVITY TIMELINE */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-            <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 text-blue-600" /> Interaction Notes
-            </h3>
-            <AddNoteForm contactId={contact.id} />
+        <div className="lg:col-span-8 space-y-6">
+          <div className="flex items-center gap-2 px-2">
+            <FileText className="w-4 h-4 text-slate-400" />
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Financial Execution</h3>
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-            <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-6">Activity Timeline</h3>
-            
-            <div className="space-y-6">
-              {contact.notes.length === 0 ? (
-                <div className="text-center p-8 border-2 border-dashed border-slate-200 rounded-lg text-slate-500">
-                  No notes recorded yet. Log your first interaction above.
-                </div>
-              ) : (
-                contact.notes.map((note) => (
-                  <div key={note.id} className={`flex gap-4 transition-all ${note.isCompleted ? 'opacity-60 grayscale' : ''}`}>
-                    
-                    {/* Checkbox OR Icon */}
-                    <div>
-                      {note.isTask ? (
-                        <TaskCheckbox noteId={note.id} contactId={contact.id} isCompleted={note.isCompleted} />
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center mt-1">
-                          <UserCircle className="w-5 h-5 text-slate-400" />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* The Note Body */}
-                    <div className={`flex-1 rounded-lg p-4 border shadow-sm ${
-                      note.isTask 
-                        ? (note.isCompleted ? 'bg-slate-50 border-slate-200 line-through' : 'bg-amber-50 border-amber-200') 
-                        : 'bg-white border-slate-200'
-                    }`}>
-                      <p className="text-slate-800 text-sm leading-relaxed">{note.content}</p>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-3 block flex flex-wrap items-center gap-2">
-    {note.isTask && !note.isCompleted && <span className="text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">PENDING ACTION</span>}
-    {note.isTask && note.isCompleted && <span className="text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded">COMPLETED</span>}
-    
-    {/* NEW: Displays the Scheduled Due Date */}
-    {note.dueDate && (
-      <span className={`px-1.5 py-0.5 rounded ${note.isCompleted ? 'bg-slate-200 text-slate-500' : 'bg-blue-100 text-blue-700'}`}>
-        DUE: {new Date(note.dueDate).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
-      </span>
-    )}
-
-    <span className="ml-auto text-slate-300">Logged: {new Date(note.createdAt).toLocaleDateString()}</span>
-  </span>
-                    </div>
-
-                  </div>
-                ))
-              )}
+          {currentStage === "LEAD" ? (
+            <div className="bg-white p-16 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col items-center justify-center text-center">
+              <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mb-6">
+                <CheckCircle2 className="w-8 h-8" />
+              </div>
+              <h4 className="text-xl font-black uppercase tracking-tight text-slate-900 mb-2">Lead Registered</h4>
+              <p className="text-slate-500 text-sm max-w-xs mb-8">
+                Initialize the reservation to begin financial modeling.
+              </p>
+              <InitializeReservationForm contactId={contact.id} unitId={contact.interestedUnitId} />
             </div>
-          </div>
+          ) : activeDeal && (
+            <div className="space-y-8">
+              <ManualLedgerBuilder 
+                opportunityId={activeDeal.id} 
+                contactId={contact.id} 
+                entries={activeDeal.ledgerEntries} 
+                agreedPrice={activeDeal.agreedPrice}
+              />
+              <OfferLetterGenerator 
+                contact={contact}
+                opportunity={activeDeal}
+                ledgerEntries={activeDeal.ledgerEntries}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>

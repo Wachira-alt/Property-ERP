@@ -25,10 +25,13 @@ export default async function AdminTeamPage() {
             <input name="name" placeholder="Full Name" className="w-full border rounded-lg px-3 py-2.5 text-sm" required />
             <input name="email" type="email" placeholder="Email Address" className="w-full border rounded-lg px-3 py-2.5 text-sm" required />
             <select name="role" className="w-full border rounded-lg px-3 py-2.5 text-sm bg-white">
-              <option value="SALES">Sales Agent</option>
-              <option value="ACCOUNTS">Accountant</option>
-              <option value="ADMIN">Administrator</option>
-            </select>
+  <option value="SALES">Sales Agent</option>
+  <option value="ACCOUNTS">Accountant</option>
+  <option value="ADMIN">Administrator</option>
+  <option value="GENERAL_MANAGER">General Manager</option>
+  <option value="CONSTRUCTION">Construction</option>
+  <option value="HUMAN_RESOURCE">Human Resource</option>
+</select>
             <Button type="submit" className="w-full bg-slate-900 text-white font-bold py-5">
               Onboard Member
             </Button>

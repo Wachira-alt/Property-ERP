@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { globalSearch } from "@/app/actions";
+import { globalSearch } from "@/app/actions/admin";
 import { Search, User, Building2, GitMerge } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
