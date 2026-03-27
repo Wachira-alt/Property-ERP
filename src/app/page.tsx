@@ -67,45 +67,45 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
         {/* QUADRANT 2: PROJECT & UNIT STATISTICS */}
-        <div className="lg:col-span-7 space-y-6">
-          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 px-2">Project Stock Absorption</h3>
-          <div className="grid grid-cols-1 gap-4">
-            {projects.length === 0 ? (
-              <div className="p-10 border-2 border-dashed border-slate-100 rounded-[2rem] text-center text-slate-300 font-black uppercase text-[10px] tracking-widest">
-                No Projects Registered
+<div className="lg:col-span-7 space-y-6">
+  <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 px-2">Project Stock Absorption</h3>
+  <div className="grid grid-cols-1 gap-4">
+    {projects.map(project => {
+      const allUnits = project.unitTypes.flatMap(t => t.units);
+      const soldUnits = allUnits.filter(u => u.status === "SOLD").length;
+      const reservedUnits = allUnits.filter(u => u.status === "RESERVED").length;
+      const availableUnits = allUnits.filter(u => u.status === "AVAILABLE").length;
+      const percent = allUnits.length > 0 ? (soldUnits / allUnits.length) * 100 : 0;
+      
+      return (
+        <div key={project.id} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm group hover:border-blue-200 transition-all">
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white">
+                <Building2 className="w-5 h-5" />
               </div>
-            ) : (
-              projects.map(project => {
-                const allUnits = project.unitTypes.flatMap(t => t.units);
-                const soldUnits = allUnits.filter(u => u.status === "SOLD").length;
-                const percent = allUnits.length > 0 ? (soldUnits / allUnits.length) * 100 : 0;
-                
-                return (
-                  <div key={project.id} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm group hover:border-blue-200 transition-all">
-                    <div className="flex justify-between items-center mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white">
-                          <Building2 className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-black uppercase tracking-tight text-slate-900">{project.name}</p>
-                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{allUnits.length} Units in Portfolio</p>
-                        </div>
-                      </div>
-                      <span className="text-xs font-black text-blue-600 italic tracking-tighter">{percent.toFixed(0)}% ABSORBED</span>
-                    </div>
-                    <div className="h-3 w-full bg-slate-50 rounded-full overflow-hidden flex p-[2px] border border-slate-100">
-                      <div 
-                        className="h-full bg-blue-600 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(37,99,235,0.3)]" 
-                        style={{ width: `${percent}%` }} 
-                      />
-                    </div>
-                  </div>
-                );
-              })
-            )}
+              <div>
+                <p className="text-sm font-black uppercase tracking-tight text-slate-900">{project.name}</p>
+                <div className="flex gap-3 mt-1">
+                   <p className="text-[8px] font-bold text-emerald-500 uppercase tracking-tighter">{availableUnits} Available</p>
+                   <p className="text-[8px] font-bold text-amber-500 uppercase tracking-tighter">{reservedUnits} Reserved</p>
+                   <p className="text-[8px] font-bold text-blue-500 uppercase tracking-tighter">{soldUnits} Sold</p>
+                </div>
+              </div>
+            </div>
+            <span className="text-xs font-black text-blue-600 italic tracking-tighter">{percent.toFixed(0)}% ABSORBED</span>
+          </div>
+          <div className="h-3 w-full bg-slate-50 rounded-full overflow-hidden flex p-[2px] border border-slate-100">
+            <div 
+              className="h-full bg-blue-600 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(37,99,235,0.3)]" 
+              style={{ width: `${percent}%` }} 
+            />
           </div>
         </div>
+      );
+    })}
+  </div>
+</div>
 
         {/* QUADRANT 3: AGENT & CONTACT STATISTICS */}
         <div className="lg:col-span-5 space-y-6">
