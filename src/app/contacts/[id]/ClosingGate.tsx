@@ -1,44 +1,59 @@
+// src/app/contacts/[id]/ClosingGate.tsx
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { ShieldAlert, PartyPopper, Lock } from "lucide-react";
-import { finalizeSale } from "@/app/actions/contacts";
 import { useState } from "react";
+import { Lock, Unlock, Zap, ShieldCheck } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { finalizeSale } from "@/app/actions/documents";
+import { toast } from "sonner";
 
-export function ClosingGate({ contactId, unitId, opportunityId, isDocsReady }: any) {
-  const [loading, setLoading] = useState(false);
+export function ClosingGate({ opportunity }: { opportunity: any }) {
+  const [isPending, setIsPending] = useState(false);
 
-  if (!isDocsReady) {
+  // Optional chaining prevents 'undefined' crashes during initial load
+  const canFinalize = 
+    !!opportunity?.contact?.idDocumentUrl && 
+    !!opportunity?.contact?.kraDocumentUrl && 
+    !!opportunity?.contact?.signedOfferUrl && 
+    !!opportunity?.contact?.bookingFeeUrl;
+
+  if (opportunity?.status === "CLOSED") {
     return (
-      <div className="p-6 bg-slate-100 border border-slate-200 rounded-[2rem] flex flex-col items-center text-center gap-3">
-        <Lock className="w-6 h-6 text-slate-400" />
-        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-          Stage 4 Locked: Missing Mandatory Documents (ID, KRA, Offer, or Receipt)
-        </p>
+      <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white border border-blue-500/30 flex items-center justify-between">
+        <h2 className="text-3xl font-black uppercase italic tracking-tighter">Unit Hard-Locked</h2>
+        <ShieldCheck className="w-10 h-10 text-blue-400" />
       </div>
     );
   }
 
   return (
-    <div className="p-6 bg-blue-50 border border-blue-200 rounded-[2rem] flex flex-col items-center text-center gap-4">
-      <div className="w-12 h-12 bg-blue-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-blue-500/30">
-        <PartyPopper className="w-6 h-6" />
+    <div className={`p-8 rounded-[2.5rem] border-2 transition-all ${canFinalize ? 'border-emerald-500 bg-white' : 'border-slate-100 bg-slate-50'}`}>
+      <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            {canFinalize ? <Unlock className="w-5 h-5 text-emerald-500" /> : <Lock className="w-5 h-5 text-slate-300" />}
+            <h3 className="text-xl font-black uppercase tracking-tighter text-slate-900">Finalize Transaction</h3>
+          </div>
+          <p className="text-xs font-bold text-slate-400 uppercase">
+            {canFinalize ? "Verification complete. Lock as SOLD." : "Complete all 4 document slots to unlock."}
+          </p>
+        </div>
+        <Button 
+          onClick={async () => {
+            setIsPending(true);
+            try {
+              await finalizeSale(opportunity.id);
+              toast.success("Unit Status: SOLD");
+            } catch (e: any) {
+              toast.error(e.message);
+            } finally { setIsPending(false); }
+          }}
+          disabled={!canFinalize || isPending}
+          className={`h-20 px-12 rounded-[1.5rem] font-black uppercase ${canFinalize ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-400'}`}
+        >
+          {isPending ? "Locking..." : "Finalize Sale"}
+        </Button>
       </div>
-      <div className="space-y-1">
-        <h4 className="text-sm font-black uppercase text-blue-900 tracking-tight">Ready to Close Sale</h4>
-        <p className="text-[10px] font-medium text-blue-700">All KYC and financial proofs have been vaulted.</p>
-      </div>
-      <Button 
-        onClick={async () => {
-          setLoading(true);
-          await finalizeSale(opportunityId, unitId, contactId);
-          setLoading(false);
-        }}
-        disabled={loading}
-        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black uppercase tracking-widest py-6 rounded-2xl"
-      >
-        {loading ? "Closing..." : "Finalize Sale (Stage 4)"}
-      </Button>
     </div>
   );
 }
