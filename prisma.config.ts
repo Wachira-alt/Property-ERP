@@ -1,9 +1,14 @@
-import "dotenv/config";
-import { defineConfig, env } from "prisma/config";
+import * as dotenv from "dotenv"
+dotenv.config({ path: ".env.local" })
+
+import { defineConfig } from "prisma/config"
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
-  datasource: {
-    url: env("DATABASE_URL"),
+  migrations: {
+    path: "prisma/migrations",
   },
-});
+  datasource: {
+    url: process.env.DIRECT_URL!,
+  },
+})
