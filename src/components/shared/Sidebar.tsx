@@ -1,0 +1,279 @@
+"use client"
+
+import { useState } from "react"
+import Link from "next/link"
+import { usePathname, useRouter } from "next/navigation"
+import {
+  Users,
+  LayoutGrid,
+  Wallet,
+  Megaphone,
+  Settings,
+  UserCog,
+  LogOut,
+  Menu,
+  X,
+  Building2,
+  ChevronRight,
+} from "lucide-react"
+import { cn } from "@/lib/utils"
+import { toast } from "sonner"
+import type { SessionUser } from "@/types/auth"
+import type { Action } from "@/lib/permissions"
+import { canPerform } from "@/lib/permissions"
+
+type NavItem = {
+  label: string
+  href: string
+  icon: React.ElementType
+  requiredAction?: Action
+}
+
+const NAV_ITEMS: NavItem[] = [
+  {
+    label: "Contacts",
+    href: "/contacts",
+    icon: Users,
+  },
+  {
+    label: "Inventory",
+    href: "/inventory",
+    icon: LayoutGrid,
+    requiredAction: "MANAGE_INVENTORY",
+  },
+  {
+    label: "Finance",
+    href: "/finance",
+    icon: Wallet,
+    requiredAction: "VIEW_FINANCE",
+  },
+  {
+    label: "Marketing",
+    href: "/marketing",
+    icon: Megaphone,
+    requiredAction: "SEND_CAMPAIGN",
+  },
+]
+
+const ADMIN_ITEMS: NavItem[] = [
+  {
+    label: "Team",
+    href: "/admin/team",
+    icon: UserCog,
+    requiredAction: "MANAGE_TEAM",
+  },
+  {
+    label: "Projects",
+    href: "/admin/projects",
+    icon: Settings,
+    requiredAction: "MANAGE_INVENTORY",
+  },
+]
+
+function NavLink({
+  item,
+  onClick,
+}: {
+  item: NavItem
+  onClick?: () => void
+}) {
+  const pathname = usePathname()
+  const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
+  const Icon = item.icon
+
+  return (
+    <Link
+      href={item.href}
+      onClick={onClick}
+      className={cn(
+        "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-100 group",
+        isActive
+          ? "bg-[#21262d] text-[#e6edf3] font-medium"
+          : "text-[#7d8590] hover:text-[#e6edf3] hover:bg-[#21262d]"
+      )}
+    >
+      <Icon
+        size={16}
+        className={cn(
+          "shrink-0 transition-colors",
+          isActive ? "text-[#e6edf3]" : "text-[#7d8590] group-hover:text-[#e6edf3]"
+        )}
+      />
+      <span>{item.label}</span>
+      {isActive && (
+        <ChevronRight size={14} className="ml-auto text-[#7d8590]" />
+      )}
+    </Link>
+  )
+}
+
+function SidebarContent({
+  user,
+  onNavigate,
+}: {
+  user: SessionUser
+  onNavigate?: () => void
+}) {
+  const router = useRouter()
+  const [loggingOut, setLoggingOut] = useState(false)
+
+  const visibleNav = NAV_ITEMS.filter(
+    (item) => !item.requiredAction || canPerform(user.role, item.requiredAction)
+  )
+
+  const visibleAdmin = ADMIN_ITEMS.filter(
+    (item) => !item.requiredAction || canPerform(user.role, item.requiredAction)
+  )
+
+  async function handleLogout() {
+    setLoggingOut(true)
+    try {
+      await fetch("/api/auth", { method: "DELETE" })
+      router.push("/login")
+      router.refresh()
+    } catch {
+      toast.error("Failed to log out")
+      setLoggingOut(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Logo */}
+      <div className="px-4 py-4 border-b border-[#21262d]">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-md bg-[#1f6feb] flex items-center justify-center shrink-0">
+            <Building2 size={15} className="text-white" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-[#e6edf3] truncate leading-tight">
+              Property ERP
+            </p>
+            <p className="text-[11px] text-[#7d8590] truncate leading-tight capitalize">
+              {user.role.toLowerCase().replace("_", " ")}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Nav */}
+      <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
+        {visibleNav.map((item) => (
+          <NavLink key={item.href} item={item} onClick={onNavigate} />
+        ))}
+
+        {/* Admin section */}
+        {visibleAdmin.length > 0 && (
+          <>
+            <div className="pt-4 pb-1 px-3">
+              <p className="text-[11px] font-medium text-[#7d8590] uppercase tracking-wider">
+                Admin
+              </p>
+            </div>
+            {visibleAdmin.map((item) => (
+              <NavLink key={item.href} item={item} onClick={onNavigate} />
+            ))}
+          </>
+        )}
+      </nav>
+
+      {/* User footer */}
+      <div className="border-t border-[#21262d] px-3 py-3 space-y-0.5">
+        <div className="flex items-center gap-3 px-3 py-2 rounded-md">
+          <div className="w-6 h-6 rounded-full bg-[#1f6feb] flex items-center justify-center shrink-0">
+            <span className="text-[11px] font-semibold text-white">
+              {user.name.charAt(0).toUpperCase()}
+            </span>
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium text-[#e6edf3] truncate leading-tight">
+              {user.name}
+            </p>
+            <p className="text-[11px] text-[#7d8590] truncate leading-tight">
+              {user.email}
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={handleLogout}
+          disabled={loggingOut}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-[#7d8590] hover:text-[#f85149] hover:bg-[#21262d] transition-colors duration-100 disabled:opacity-50"
+        >
+          <LogOut size={16} className="shrink-0" />
+          <span>{loggingOut ? "Signing out..." : "Sign out"}</span>
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export function Sidebar({ user }: { user: SessionUser }) {
+  const [mobileOpen, setMobileOpen] = useState(false)
+
+  return (
+    <>
+      {/* ── Desktop sidebar ─────────────────────────────── */}
+      <aside className="hidden md:flex fixed left-0 top-0 h-screen w-[240px] flex-col bg-[#010409] border-r border-[#21262d] z-40">
+        <SidebarContent user={user} />
+      </aside>
+
+      {/* ── Mobile top bar ──────────────────────────────── */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 h-14 bg-[#010409] border-b border-[#21262d]">
+        <div className="flex items-center gap-2.5">
+          <div className="w-6 h-6 rounded-md bg-[#1f6feb] flex items-center justify-center">
+            <Building2 size={13} className="text-white" />
+          </div>
+          <span className="text-sm font-semibold text-[#e6edf3]">
+            Property ERP
+          </span>
+        </div>
+
+        <button
+          onClick={() => setMobileOpen(true)}
+          className="p-1.5 rounded-md text-[#7d8590] hover:text-[#e6edf3] hover:bg-[#21262d] transition-colors"
+          aria-label="Open menu"
+        >
+          <Menu size={20} />
+        </button>
+      </div>
+
+      {/* Mobile top bar spacer */}
+      <div className="md:hidden h-14" />
+
+      {/* ── Mobile drawer overlay ───────────────────────── */}
+      {mobileOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-50 flex"
+          role="dialog"
+          aria-modal="true"
+        >
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setMobileOpen(false)}
+          />
+
+          {/* Drawer */}
+          <div className="relative w-[240px] h-full bg-[#010409] border-r border-[#21262d] flex flex-col">
+            {/* Close button */}
+            <div className="absolute top-3 right-3">
+              <button
+                onClick={() => setMobileOpen(false)}
+                className="p-1.5 rounded-md text-[#7d8590] hover:text-[#e6edf3] hover:bg-[#21262d] transition-colors"
+                aria-label="Close menu"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <SidebarContent
+              user={user}
+              onNavigate={() => setMobileOpen(false)}
+            />
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
