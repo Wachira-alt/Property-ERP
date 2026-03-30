@@ -3,16 +3,42 @@ import { getSession } from "@/lib/auth"
 import { getContactById } from "@/actions/contacts"
 import { getAvailableUnitsByProject } from "@/actions/inventory"
 import { PipelineStages } from "./_components/PipelineStages"
-import { GreenStage } from "./_components/GreenStage"
-import { AmberStage } from "./_components/AmberStage"
-import { BlueStage } from "./_components/BlueStage"
-import { AddNoteForm } from "./_components/AddNoteForm"
-import { formatDate } from "@/lib/utils"
-import { Phone, Mail, User, Building2, ArrowLeft } from "lucide-react"
+import { GreenStage }     from "./_components/GreenStage"
+import { AmberStage }     from "./_components/AmberStage"
+import { BlueStage }      from "./_components/BlueStage"
+import { AddNoteForm }    from "./_components/AddNoteForm"
+import { MoveToAmberBtn } from "./_components/MoveToAmberBtn"
+import { formatDate }     from "@/lib/utils"
+import { canPerform }     from "@/lib/permissions"
+import {
+  Phone,
+  Mail,
+  User,
+  Building2,
+  ArrowLeft,
+} from "lucide-react"
 import Link from "next/link"
 
 type Props = {
   params: Promise<{ id: string }>
+}
+
+const STAGE_DOT: Record<string, string> = {
+  GREEN:     "bg-[#3fb950]",
+  AMBER:     "bg-[#d29922]",
+  CLOSED:    "bg-[#58a6ff]",
+  PAST:      "bg-[#a371f7]",
+  EXPIRED:   "bg-[#484f58]",
+  CANCELLED: "bg-[#f85149]",
+}
+
+const STAGE_LABEL: Record<string, string> = {
+  GREEN:     "Green Stage — Lead",
+  AMBER:     "Amber Stage — Reservation",
+  CLOSED:    "Blue Stage — Closed",
+  PAST:      "Past — Fully Paid",
+  EXPIRED:   "Expired",
+  CANCELLED: "Cancelled",
 }
 
 export default async function ContactDetailPage({ params }: Props) {
@@ -24,11 +50,22 @@ export default async function ContactDetailPage({ params }: Props) {
 
   if (!contact) notFound()
 
-  const opp           = contact.opportunity
-  const currentStage  = opp?.stage ?? "GREEN"
+  const opp          = contact.opportunity
+  const currentStage = opp?.stage ?? "GREEN"
+
   const availableUnits = opp
     ? await getAvailableUnitsByProject(contact.projectId)
     : []
+
+  const hasNationalId = opp?.documents.some((d) => d.type === "NATIONAL_ID") ?? false
+  const hasKraPin     = opp?.documents.some((d) => d.type === "KRA_PIN")     ?? false
+
+  const canMoveToAmber =
+    currentStage === "GREEN" &&
+    !!opp?.unitId &&
+    hasNationalId &&
+    hasKraPin &&
+    canPerform(session.role, "MOVE_TO_AMBER")
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -89,6 +126,16 @@ export default async function ContactDetailPage({ params }: Props) {
             </span>
           </span>
         </div>
+        {opp?.unit && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[#7d8590]">
+              Unit:{" "}
+              <span className="text-[#e6edf3] font-medium">
+                {opp.unit.name}
+              </span>
+            </span>
+          </div>
+        )}
         <div className="ml-auto">
           <span className="text-[11px] text-[#484f58]">
             Added {formatDate(contact.createdAt)}
@@ -99,61 +146,93 @@ export default async function ContactDetailPage({ params }: Props) {
       {/* Main grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Pipeline stage panel — 2/3 width */}
-        <div className="lg:col-span-2 space-y-5">
-          {/* Stage card */}
+        <div className="lg:col-span-2 space-y-4">
           <div className="border border-[#30363d] rounded-lg bg-[#161b22] overflow-hidden">
-            <div className="px-5 py-3.5 border-b border-[#30363d] flex items-center gap-2">
-              <div
-                className={`w-2 h-2 rounded-full ${
-                  currentStage === "GREEN"
-                    ? "bg-[#3fb950]"
-                    : currentStage === "AMBER"
-                    ? "bg-[#d29922]"
-                    : currentStage === "CLOSED"
-                    ? "bg-[#58a6ff]"
-                    : "bg-[#484f58]"
-                }`}
-              />
-              <h2 className="text-sm font-medium text-[#e6edf3]">
-                {currentStage === "GREEN"
-                  ? "Green Stage — Lead"
-                  : currentStage === "AMBER"
-                  ? "Amber Stage — Reservation"
-                  : currentStage === "CLOSED"
-                  ? "Blue Stage — Closed"
-                  : currentStage === "EXPIRED"
-                  ? "Expired"
-                  : "Cancelled"}
-              </h2>
+            {/* Stage card header */}
+            <div className="px-5 py-3.5 border-b border-[#30363d] flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <div
+                  className={`w-2 h-2 rounded-full ${
+                    STAGE_DOT[currentStage] ?? "bg-[#484f58]"
+                  }`}
+                />
+                <h2 className="text-sm font-medium text-[#e6edf3]">
+                  {STAGE_LABEL[currentStage] ?? currentStage}
+                </h2>
+              </div>
+
+              {canMoveToAmber && (
+                <MoveToAmberBtn contactId={contact.id} />
+              )}
             </div>
 
+            {/* Stage content */}
             <div className="p-5">
               {currentStage === "GREEN" && (
                 <GreenStage
                   contactId={contact.id}
+                  opportunityId={opp?.id ?? null}
                   assignedUnitId={opp?.unitId ?? null}
                   assignedUnit={opp?.unit ?? null}
                   availableUnits={availableUnits}
+                  documents={opp?.documents ?? []}
                 />
               )}
-              {currentStage === "AMBER" && (
+
+              {currentStage === "AMBER" && opp && (
                 <AmberStage
                   contact={contact}
-                  opportunity={opp!}
+                  opportunity={{
+                    ...opp,
+                    agreedPrice:   opp.agreedPrice   ?? null,
+                    paymentMethod: opp.paymentMethod ?? null,
+                    unitId:        opp.unitId        ?? null,
+                  }}
                   session={session}
                 />
               )}
-              {currentStage === "CLOSED" && (
+
+              {currentStage === "CLOSED" && opp && (
                 <BlueStage
                   contact={contact}
-                  opportunity={opp!}
+                  opportunity={opp}
                   session={session}
                 />
               )}
-              {(currentStage === "EXPIRED" || currentStage === "CANCELLED") && (
-                <p className="text-sm text-[#7d8590]">
-                  This opportunity has been {currentStage.toLowerCase()}.
-                </p>
+
+              {currentStage === "PAST" && (
+                <div className="py-6 text-center space-y-1">
+                  <p className="text-sm font-medium text-[#a371f7]">
+                    Fully paid
+                  </p>
+                  <p className="text-xs text-[#7d8590]">
+                    All payments have been received. This client is available
+                    for future marketing campaigns.
+                  </p>
+                </div>
+              )}
+
+              {currentStage === "EXPIRED" && (
+                <div className="py-6 text-center space-y-1">
+                  <p className="text-sm font-medium text-[#7d8590]">
+                    Reservation expired
+                  </p>
+                  <p className="text-xs text-[#484f58]">
+                    The 7-day reservation window elapsed. The unit has been
+                    released back to available inventory.
+                  </p>
+                </div>
+              )}
+
+              {currentStage === "CANCELLED" && (
+                <div className="py-6 text-center space-y-1">
+                  <p className="text-sm font-medium text-[#f85149]">
+                    Cancelled
+                  </p>
+                  <p className="text-xs text-[#484f58]">
+                    This opportunity was cancelled.
+                  </p>
+                </div>
               )}
             </div>
           </div>
