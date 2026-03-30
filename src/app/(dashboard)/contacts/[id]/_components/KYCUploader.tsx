@@ -139,7 +139,7 @@ export function KYCUploader({
       </div>
 
       {uploaded && fileUrl && (
-        
+        <a
           href={fileUrl}
           target="_blank"
           rel="noopener noreferrer"

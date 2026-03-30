@@ -1,23 +1,60 @@
-import { deleteFromDrive } from "@/lib/google-drive"
+"use server"
+
+import { revalidatePath } from "next/cache"
+import { z } from "zod"
+import { prisma } from "@/lib/prisma"
+import { requireAuth } from "@/lib/auth"
+
+const saveDocumentSchema = z.object({
+  opportunityId: z.string().min(1),
+  type:          z.enum([
+    "NATIONAL_ID",
+    "KRA_PIN",
+    "OFFER_LETTER_UNSIGNED",
+    "OFFER_LETTER_SIGNED",
+    "BOOKING_RECEIPT",
+  ]),
+  fileName: z.string().min(1),
+  fileUrl:  z.string().url(),
+  fileKey:  z.string().min(1),
+})
+
+export async function saveDocumentRecord(data: {
+  opportunityId: string
+  type: string
+  fileName: string
+  fileUrl: string
+  fileKey: string
+}) {
+  await requireAuth()
+
+  const parsed = saveDocumentSchema.safeParse(data)
+  if (!parsed.success) {
+    return { error: parsed.error.errors[0].message }
+  }
+
+  try {
+    // Replace existing document of same type
+    await prisma.document.deleteMany({
+      where: {
+        opportunityId: parsed.data.opportunityId,
+        type:          parsed.data.type,
+      },
+    })
+
+    await prisma.document.create({ data: parsed.data })
+
+    revalidatePath("/contacts")
+    return { success: true }
+  } catch {
+    return { error: "Failed to save document record." }
+  }
+}
 
 export async function deleteDocument(documentId: string, contactId: string) {
   await requireAuth()
 
   try {
-    const doc = await prisma.document.findUnique({
-      where: { id: documentId },
-    })
-
-    if (!doc) return { error: "Document not found." }
-
-    // Delete from Google Drive using the stored fileKey (Drive file ID)
-    try {
-      await deleteFromDrive(doc.fileKey)
-    } catch {
-      // Log but don't block — DB record should still be removed
-      console.error(`[deleteDocument] Failed to delete from Drive: ${doc.fileKey}`)
-    }
-
     await prisma.document.delete({ where: { id: documentId } })
     revalidatePath(`/contacts/${contactId}`)
     return { success: true }

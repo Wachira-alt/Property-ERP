@@ -1,3 +1,5 @@
+import "server-only"
+
 import { google } from "googleapis"
 import { Readable } from "stream"
 
@@ -28,6 +30,7 @@ export async function uploadToDrive({
   const stream = Readable.from(buffer)
 
   const response = await drive.files.create({
+    supportsAllDrives: true,
     requestBody: {
       name:    fileName,
       parents: [folder],
@@ -44,6 +47,7 @@ export async function uploadToDrive({
   // Make the file readable by anyone with the link
   await drive.permissions.create({
     fileId,
+    supportsAllDrives: true,
     requestBody: {
       role: "reader",
       type: "anyone",
@@ -53,6 +57,7 @@ export async function uploadToDrive({
   // Get final file metadata with links
   const file = await drive.files.get({
     fileId,
+    supportsAllDrives: true,
     fields: "id, webViewLink, webContentLink",
   })
 
@@ -65,5 +70,5 @@ export async function uploadToDrive({
 
 export async function deleteFromDrive(fileId: string): Promise<void> {
   const drive = getDriveClient()
-  await drive.files.delete({ fileId })
+  await drive.files.delete({ fileId, supportsAllDrives: true })
 }
