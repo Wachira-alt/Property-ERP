@@ -26,6 +26,7 @@ enum PipelineStage {
   GREEN
   AMBER
   CLOSED
+  PAST
   EXPIRED
   CANCELLED
 }
@@ -151,7 +152,7 @@ model Contact {
 model Opportunity {
   id            String        @id @default(cuid())
   contactId     String        @unique
-  unitId        String        @unique
+  unitId        String?       @unique   // ← add the ?
   stage         PipelineStage @default(GREEN)
   agreedPrice   Decimal?      @db.Decimal(12, 2)
   paymentMethod PaymentMethod?
@@ -160,7 +161,7 @@ model Opportunity {
   updatedAt     DateTime      @updatedAt
 
   contact       Contact       @relation(fields: [contactId], references: [id])
-  unit          Unit          @relation(fields: [unitId], references: [id])
+  unit          Unit?         @relation(fields: [unitId], references: [id])  // ← add the ?
   ledgerEntries LedgerEntry[]
   documents     Document[]
 

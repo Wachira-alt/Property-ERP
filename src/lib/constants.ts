@@ -16,6 +16,7 @@ export const PIPELINE_STAGE = {
   GREEN: "GREEN",
   AMBER: "AMBER",
   CLOSED: "CLOSED",
+  PAST:      "PAST",
   EXPIRED: "EXPIRED",
   CANCELLED: "CANCELLED",
 } as const
