@@ -16,6 +16,7 @@ import {
   User,
   Building2,
   ArrowLeft,
+  CheckCircle2
 } from "lucide-react"
 import Link from "next/link"
 import { FinalizeSaleBtn } from "./_components/FinalizeSaleBtn"
@@ -68,9 +69,10 @@ export default async function ContactDetailPage({ params }: Props) {
     hasNationalId &&
     hasKraPin &&
     canPerform(session.role, "MOVE_TO_AMBER")
+    
   const canShowFinalizeBtn =
-  currentStage === "AMBER" &&
-  canPerform(session.role, "MOVE_TO_CLOSED")
+    currentStage === "AMBER" &&
+    canPerform(session.role, "MOVE_TO_CLOSED")
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -170,22 +172,21 @@ export default async function ContactDetailPage({ params }: Props) {
                 <MoveToAmberBtn contactId={contact.id} />
               )}
               {canShowFinalizeBtn && opp && (
-  <FinalizeSaleBtn
-    contactId={contact.id}
-    contactName={`${contact.firstName} ${contact.lastName}`}
-    unitName={opp.unit?.name ?? "—"}
-    agreedPrice={
-      opp.agreedPrice
-        ? formatCurrency(
-            typeof opp.agreedPrice === "object"
-              ? (opp.agreedPrice as any).toNumber()
-              : Number(opp.agreedPrice)
-          )
-        : "—"
-    }
-  />
-)}
-              
+                <FinalizeSaleBtn
+                  contactId={contact.id}
+                  contactName={`${contact.firstName} ${contact.lastName}`}
+                  unitName={opp.unit?.name ?? "—"}
+                  agreedPrice={
+                    opp.agreedPrice
+                      ? formatCurrency(
+                          typeof opp.agreedPrice === "object"
+                            ? (opp.agreedPrice as any).toNumber()
+                            : Number(opp.agreedPrice)
+                        )
+                      : "—"
+                  }
+                />
+              )}
             </div>
 
             {/* Stage content */}
@@ -214,23 +215,23 @@ export default async function ContactDetailPage({ params }: Props) {
                 />
               )}
 
-              {currentStage === "CLOSED" && opp && (
-                <BlueStage
-                  contact={contact}
-                  opportunity={opp}
-                  session={session}
-                />
-              )}
-
-              {currentStage === "PAST" && (
-                <div className="py-6 text-center space-y-1">
-                  <p className="text-sm font-medium text-[#a371f7]">
-                    Fully paid
-                  </p>
-                  <p className="text-xs text-[#7d8590]">
-                    All payments have been received. This client is available
-                    for future marketing campaigns.
-                  </p>
+              {/* PAST & CLOSED both use BlueStage to show ID, KRA, Receipting and Statements */}
+              {(currentStage === "CLOSED" || currentStage === "PAST") && opp && (
+                <div className="space-y-6">
+                  {currentStage === "PAST" && (
+                    <div className="flex items-center gap-3 p-3 bg-[#1a4f2a]/20 border border-[#2ea043] rounded-lg mb-4">
+                      <CheckCircle2 size={18} className="text-[#3fb950]" />
+                      <div>
+                        <p className="text-xs font-semibold text-[#3fb950]">Transaction Complete</p>
+                        <p className="text-[11px] text-[#7d8590]">All payments collected. Accessing archive reference below.</p>
+                      </div>
+                    </div>
+                  )}
+                  <BlueStage
+                    contact={contact}
+                    opportunity={opp}
+                    session={session}
+                  />
                 </div>
               )}
 
