@@ -4,6 +4,7 @@ import { canPerform } from "@/lib/permissions"
 import type { SessionUser } from "@/types/auth"
 import { AlertCircle } from "lucide-react"
 import Link from "next/link"
+import { DownloadBtn } from "@/components/shared/DownloadBtn"
 
 type LedgerEntry = {
   id:          string
@@ -112,10 +113,21 @@ export function LedgerTable({ entries, session }: Props) {
                 </div>
                 {/* Payment ref on mobile */}
                 {entry.paymentRef && (
-                  <p className="text-[10px] text-[#484f58] font-mono mt-0.5 md:hidden">
-                    Ref: {entry.paymentRef}
-                  </p>
-                )}
+  <p className="text-[10px] text-[#484f58] font-mono mt-0.5 md:hidden">
+    Ref: {entry.paymentRef}
+  </p>
+)}
+{/* Receipt download on mobile */}
+{entry.status === "PAID" && (
+  <div className="md:hidden mt-1">
+    <DownloadBtn
+      url={`/api/documents/receipt?entryId=${entry.id}`}
+      fileName={`receipt-${entry.id.slice(-6)}.pdf`}
+      label="Download receipt"
+      variant="inline"
+    />
+  </div>
+)}
               </div>
 
               {/* Client — desktop */}
@@ -144,27 +156,36 @@ export function LedgerTable({ entries, session }: Props) {
               </div>
 
               {/* Status — desktop */}
-              <div className="hidden md:flex items-center">
-                <div className="space-y-1">
-                  <span
-                    className={`inline-flex text-[10px] font-medium px-1.5 py-0.5 rounded border ${
-                      STATUS_STYLES[effectiveStatus] ?? STATUS_STYLES.PENDING
-                    }`}
-                  >
-                    {effectiveStatus}
-                  </span>
-                  {entry.paymentRef && (
-                    <p className="text-[10px] text-[#484f58] font-mono block">
-                      {entry.paymentRef}
-                    </p>
-                  )}
-                  {entry.paidAt && (
-                    <p className="text-[10px] text-[#484f58] block">
-                      {formatDate(entry.paidAt)}
-                    </p>
-                  )}
-                </div>
-              </div>
+<div className="hidden md:flex items-center">
+  <div className="space-y-1.5">
+    <span
+      className={`inline-flex text-[10px] font-medium px-1.5 py-0.5 rounded border ${
+        STATUS_STYLES[effectiveStatus] ?? STATUS_STYLES.PENDING
+      }`}
+    >
+      {effectiveStatus}
+    </span>
+    {entry.paymentRef && (
+      <p className="text-[10px] text-[#484f58] font-mono block">
+        {entry.paymentRef}
+      </p>
+    )}
+    {entry.paidAt && (
+      <p className="text-[10px] text-[#484f58] block">
+        {formatDate(entry.paidAt)}
+      </p>
+    )}
+    {entry.status === "PAID" && (
+      <DownloadBtn
+        url={`/api/documents/receipt?entryId=${entry.id}`}
+        fileName={`receipt-${entry.id.slice(-6)}.pdf`}
+        label="Receipt"
+        variant="ghost"
+        className="text-[10px] h-auto py-0.5 px-1"
+      />
+    )}
+  </div>
+</div>
 
               {/* Action — desktop */}
               {canMarkPaid && (

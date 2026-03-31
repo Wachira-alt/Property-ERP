@@ -1,6 +1,7 @@
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { TrendingUp, TrendingDown, Clock } from "lucide-react"
 import Link from "next/link"
+import { DownloadBtn } from "@/components/shared/DownloadBtn"
 
 type LedgerEntry = {
   id:          string
@@ -78,6 +79,13 @@ export function StatementView({ statement }: Props) {
             </p>
           </div>
         </div>
+         {/* Download statement */}
+    <DownloadBtn
+      url={`/api/documents/statement?contactId=${statement.contactId}`}
+      fileName={`statement-${statement.contactName.replace(/\s+/g, "-")}.pdf`}
+      label="Statement"
+      variant="default"
+    />
       </div>
 
       {/* Progress bar */}

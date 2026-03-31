@@ -134,17 +134,23 @@ export async function markAsPaid(formData: FormData) {
     })
 
     // Check if all entries are now paid → move to PAST
-    const allEntries = entry.opportunity.ledgerEntries
-    const allPaid    = allEntries
-      .filter((e) => e.id !== entryId)
-      .every((e) => e.status === "PAID")
+   const allEntries     = entry.opportunity.ledgerEntries
+const remainingUnpaid = allEntries
+  .filter((e) => e.id !== entryId)
+  .some((e) => e.status !== "PAID")
 
-    if (allPaid) {
-      await prisma.opportunity.update({
-        where: { id: entry.opportunityId },
-        data:  { stage: "PAST" },
-      })
-    }
+const shouldMoveToPast =
+  !remainingUnpaid &&
+  entry.opportunity.stage === "CLOSED"
+
+if (shouldMoveToPast) {
+  await prisma.opportunity.update({
+    where: { id: entry.opportunityId },
+    data:  { stage: "PAST" },
+  })
+
+  revalidatePath(`/contacts`)
+}
 
     revalidatePath("/finance")
     revalidatePath("/contacts")
