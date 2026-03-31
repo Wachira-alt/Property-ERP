@@ -38,7 +38,6 @@ export async function createLedgerEntry(formData: FormData) {
   const { opportunityId, description, amount, dueDate } = parsed.data
 
   try {
-    // Verify opportunity exists and is in AMBER stage
     const opportunity = await prisma.opportunity.findUnique({
       where: { id: opportunityId },
     })
@@ -61,7 +60,7 @@ export async function createLedgerEntry(formData: FormData) {
       },
     })
 
-    revalidatePath(`/contacts`)
+    revalidatePath("/contacts")
     return { success: true }
   } catch {
     return { error: "Failed to create ledger entry." }
@@ -80,9 +79,9 @@ export async function deleteLedgerEntry(entryId: string, contactId: string) {
       include: { opportunity: true },
     })
 
-    if (!entry)                         return { error: "Entry not found." }
+    if (!entry)                              return { error: "Entry not found." }
     if (entry.opportunity.stage !== "AMBER") return { error: "Cannot delete entries outside Amber stage." }
-    if (entry.status === "PAID")        return { error: "Cannot delete a paid entry." }
+    if (entry.status === "PAID")             return { error: "Cannot delete a paid entry." }
 
     await prisma.ledgerEntry.delete({ where: { id: entryId } })
 
@@ -110,19 +109,16 @@ export async function markAsPaid(formData: FormData) {
 
   const { entryId, paymentRef } = parsed.data
 
+  // ── Step 1: Load entry and validate ───────────────────────────────────────
+  const entry = await prisma.ledgerEntry.findUnique({
+    where: { id: entryId },
+  })
+
+  if (!entry)                  return { error: "Entry not found." }
+  if (entry.status === "PAID") return { error: "Entry is already marked as paid." }
+
+  // ── Step 2: Mark as paid ──────────────────────────────────────────────────
   try {
-    const entry = await prisma.ledgerEntry.findUnique({
-      where:   { id: entryId },
-      include: {
-        opportunity: {
-          include: { ledgerEntries: true },
-        },
-      },
-    })
-
-    if (!entry)                   return { error: "Entry not found." }
-    if (entry.status === "PAID")  return { error: "Entry is already marked as paid." }
-
     await prisma.ledgerEntry.update({
       where: { id: entryId },
       data: {
@@ -132,32 +128,52 @@ export async function markAsPaid(formData: FormData) {
         markedById: session.id,
       },
     })
-
-    // Check if all entries are now paid → move to PAST
-   const allEntries     = entry.opportunity.ledgerEntries
-const remainingUnpaid = allEntries
-  .filter((e) => e.id !== entryId)
-  .some((e) => e.status !== "PAID")
-
-const shouldMoveToPast =
-  !remainingUnpaid &&
-  entry.opportunity.stage === "CLOSED"
-
-if (shouldMoveToPast) {
-  await prisma.opportunity.update({
-    where: { id: entry.opportunityId },
-    data:  { stage: "PAST" },
-  })
-
-  revalidatePath(`/contacts`)
-}
-
-    revalidatePath("/finance")
-    revalidatePath("/contacts")
-    return { success: true }
   } catch {
     return { error: "Failed to mark entry as paid." }
   }
+
+  // ── Step 3: Check PAST transition with fresh queries ──────────────────────
+  try {
+    // Re-query opportunity stage fresh — never use the pre-update snapshot
+    const opportunity = await prisma.opportunity.findUnique({
+      where:  { id: entry.opportunityId },
+      select: { id: true, stage: true },
+    })
+
+    if (!opportunity) {
+      revalidatePath("/finance")
+      return { success: true }
+    }
+
+    // Re-query all entries after the update to get live statuses
+    const allEntries = await prisma.ledgerEntry.findMany({
+      where:  { opportunityId: entry.opportunityId },
+      select: { id: true, status: true },
+    })
+
+    const allPaid = allEntries.every((e) => e.status === "PAID")
+
+    console.log(
+      "[markAsPaid] stage:", opportunity.stage,
+      "| allPaid:", allPaid,
+      "| entries:", allEntries.length
+    )
+
+    if (allPaid && opportunity.stage === "CLOSED") {
+      await prisma.opportunity.update({
+        where: { id: entry.opportunityId },
+        data:  { stage: "PAST" },
+      })
+      console.log("[markAsPaid] Moved to PAST:", entry.opportunityId)
+      revalidatePath("/contacts")
+    }
+  } catch (err) {
+    console.error("[markAsPaid] Stage transition failed:", err)
+  }
+
+  revalidatePath("/finance")
+  revalidatePath("/contacts")
+  return { success: true }
 }
 
 // ─── Get Ledger Summary ───────────────────────────────────────────────────────
@@ -168,10 +184,16 @@ export async function getLedgerSummary(opportunityId: string) {
     orderBy: { dueDate: "asc" },
   })
 
-  const total    = entries.reduce((sum, e) => sum + Number(e.amount), 0)
-  const paid     = entries.filter((e) => e.status === "PAID").reduce((sum, e) => sum + Number(e.amount), 0)
-  const pending  = entries.filter((e) => e.status === "PENDING").reduce((sum, e) => sum + Number(e.amount), 0)
-  const overdue  = entries.filter((e) => e.status === "OVERDUE").reduce((sum, e) => sum + Number(e.amount), 0)
+  const total   = entries.reduce((sum, e) => sum + Number(e.amount), 0)
+  const paid    = entries
+    .filter((e) => e.status === "PAID")
+    .reduce((sum, e) => sum + Number(e.amount), 0)
+  const pending = entries
+    .filter((e) => e.status === "PENDING")
+    .reduce((sum, e) => sum + Number(e.amount), 0)
+  const overdue = entries
+    .filter((e) => e.status === "OVERDUE")
+    .reduce((sum, e) => sum + Number(e.amount), 0)
 
   return { entries, total, paid, pending, overdue }
 }
