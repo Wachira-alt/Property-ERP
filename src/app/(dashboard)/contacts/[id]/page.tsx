@@ -18,6 +18,8 @@ import {
   ArrowLeft,
 } from "lucide-react"
 import Link from "next/link"
+import { FinalizeSaleBtn } from "./_components/FinalizeSaleBtn"
+import { formatCurrency }  from "@/lib/utils"
 
 type Props = {
   params: Promise<{ id: string }>
@@ -66,6 +68,9 @@ export default async function ContactDetailPage({ params }: Props) {
     hasNationalId &&
     hasKraPin &&
     canPerform(session.role, "MOVE_TO_AMBER")
+  const canShowFinalizeBtn =
+  currentStage === "AMBER" &&
+  canPerform(session.role, "MOVE_TO_CLOSED")
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -164,6 +169,23 @@ export default async function ContactDetailPage({ params }: Props) {
               {canMoveToAmber && (
                 <MoveToAmberBtn contactId={contact.id} />
               )}
+              {canShowFinalizeBtn && opp && (
+  <FinalizeSaleBtn
+    contactId={contact.id}
+    contactName={`${contact.firstName} ${contact.lastName}`}
+    unitName={opp.unit?.name ?? "—"}
+    agreedPrice={
+      opp.agreedPrice
+        ? formatCurrency(
+            typeof opp.agreedPrice === "object"
+              ? (opp.agreedPrice as any).toNumber()
+              : Number(opp.agreedPrice)
+          )
+        : "—"
+    }
+  />
+)}
+              
             </div>
 
             {/* Stage content */}

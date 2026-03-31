@@ -2,18 +2,9 @@
 
 import { useState, useTransition } from "react"
 import { toast } from "sonner"
-import { Button } from "@/components/ui/button"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { KYCUploader }          from "./KYCUploader"
-import { ManualLedgerBuilder }  from "./ManualLedgerBuilder"
-import { DocumentGallery }      from "./DocumentGallery"
-import { moveToReservation }    from "@/actions/pipeline"
+import { KYCUploader }         from "./KYCUploader"
+import { ManualLedgerBuilder } from "./ManualLedgerBuilder"
+import { DocumentGallery }     from "./DocumentGallery"
 import { formatCurrency, formatDate, getDaysRemaining } from "@/lib/utils"
 import {
   Lock,
@@ -24,8 +15,6 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 
 type Document = {
   id:         string
@@ -48,11 +37,11 @@ type Opportunity = {
   agreedPrice:   number | null | { toNumber: () => number }
   paymentMethod: string | null
   unitId:        string | null
-  unit:          {
-    id:           string
-    name:         string
+  unit: {
+    id:            string
+    name:          string
     reservedUntil: Date | null
-    unitType:     { name: string }
+    unitType:      { name: string }
   } | null
   ledgerEntries: LedgerEntry[]
   documents:     Document[]
@@ -72,17 +61,10 @@ type Props = {
   session:     { id: string; role: string; name: string; email: string }
 }
 
-type Section = "kyc" | "ledger" | "documents" | "offer"
+type Section = "kyc" | "ledger" | "offer" | "receipt" | "documents"
 
 export function AmberStage({ contact, opportunity, session }: Props) {
-  const [isPending, startTransition] = useTransition()
   const [openSection, setOpenSection] = useState<Section>("kyc")
-
-  const [showReservationForm, setShowReservationForm] = useState(
-    !opportunity.agreedPrice
-  )
-  const [agreedPrice, setAgreedPrice]     = useState("")
-  const [paymentMethod, setPaymentMethod] = useState("")
 
   const daysRemaining = getDaysRemaining(opportunity.unit?.reservedUntil ?? null)
   const isExpired     = daysRemaining !== null && daysRemaining <= 0
@@ -93,35 +75,10 @@ export function AmberStage({ contact, opportunity, session }: Props) {
       : Number(opportunity.agreedPrice)
     : null
 
-  // KYC document presence checks
   const hasNationalId = opportunity.documents.some((d) => d.type === "NATIONAL_ID")
   const hasKraPin     = opportunity.documents.some((d) => d.type === "KRA_PIN")
-
   const nationalIdDoc = opportunity.documents.find((d) => d.type === "NATIONAL_ID")
   const kraPinDoc     = opportunity.documents.find((d) => d.type === "KRA_PIN")
-
-  function handleMoveToReservation(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    if (!agreedPrice || !paymentMethod) {
-      toast.error("Please fill in all required fields")
-      return
-    }
-
-    const fd = new FormData()
-    fd.set("contactId",     contact.id)
-    fd.set("agreedPrice",   agreedPrice)
-    fd.set("paymentMethod", paymentMethod)
-
-    startTransition(async () => {
-      const result = await moveToReservation(fd)
-      if (result?.error) {
-        toast.error(result.error)
-      } else {
-        toast.success("Reservation created — unit locked for 7 days")
-        setShowReservationForm(false)
-      }
-    })
-  }
 
   function toggleSection(s: Section) {
     setOpenSection((prev) => (prev === s ? "kyc" : s))
@@ -164,7 +121,7 @@ export function AmberStage({ contact, opportunity, session }: Props) {
         </div>
       )}
 
-      {/* Agreed price & payment — shows form if not yet set */}
+      {/* Agreed price & payment */}
       {agreedPriceNum ? (
         <div className="flex flex-wrap gap-4 px-3 py-2.5 bg-[#161b22] border border-[#30363d] rounded-lg">
           <div className="flex items-center gap-2">
@@ -187,9 +144,10 @@ export function AmberStage({ contact, opportunity, session }: Props) {
         </div>
       ) : null}
 
-      {/* Accordion sections — only available after price is set */}
+      {/* Accordion sections */}
       {agreedPriceNum && (
         <div className="space-y-2">
+
           {/* KYC Documents */}
           <AccordionSection
             id="kyc"
@@ -221,7 +179,7 @@ export function AmberStage({ contact, opportunity, session }: Props) {
             </div>
           </AccordionSection>
 
-          {/* Payment schedule */}
+          {/* Payment Schedule */}
           <AccordionSection
             id="ledger"
             open={openSection === "ledger"}
@@ -230,7 +188,8 @@ export function AmberStage({ contact, opportunity, session }: Props) {
             complete={
               opportunity.ledgerEntries.length > 0 &&
               opportunity.ledgerEntries.reduce(
-                (s, e) => s + (typeof e.amount === "object" ? e.amount.toNumber() : Number(e.amount)), 0
+                (s, e) => s + (typeof e.amount === "object" ? e.amount.toNumber() : Number(e.amount)),
+                0
               ) >= agreedPriceNum
             }
             badge={`${opportunity.ledgerEntries.length} entries`}
@@ -270,8 +229,6 @@ export function AmberStage({ contact, opportunity, session }: Props) {
                   Download Offer Letter
                 </a>
               </div>
-
-              {/* Upload signed copy */}
               <div className="pt-2 border-t border-[#21262d]">
                 <p className="text-xs font-medium text-[#e6edf3] mb-3">
                   Upload signed copy
@@ -281,21 +238,41 @@ export function AmberStage({ contact, opportunity, session }: Props) {
                   type="OFFER_LETTER_SIGNED"
                   label="Signed Offer Letter"
                   description="Upload the signed PDF from the client"
-                  uploaded={opportunity.documents.some(
-                    (d) => d.type === "OFFER_LETTER_SIGNED"
-                  )}
-                  fileUrl={opportunity.documents.find(
-                    (d) => d.type === "OFFER_LETTER_SIGNED"
-                  )?.fileUrl}
-                  fileName={opportunity.documents.find(
-                    (d) => d.type === "OFFER_LETTER_SIGNED"
-                  )?.fileName}
+                  uploaded={opportunity.documents.some((d) => d.type === "OFFER_LETTER_SIGNED")}
+                  fileUrl={opportunity.documents.find((d) => d.type === "OFFER_LETTER_SIGNED")?.fileUrl}
+                  fileName={opportunity.documents.find((d) => d.type === "OFFER_LETTER_SIGNED")?.fileName}
                 />
               </div>
             </div>
           </AccordionSection>
 
-          {/* All documents */}
+          {/* Booking Receipt */}
+          <AccordionSection
+            id="receipt"
+            open={openSection === "receipt"}
+            onToggle={() => toggleSection("receipt")}
+            title="Booking Receipt"
+            complete={opportunity.documents.some((d) => d.type === "BOOKING_RECEIPT")}
+            badge={opportunity.documents.some((d) => d.type === "BOOKING_RECEIPT") ? "✓" : "Required"}
+          >
+            <div className="space-y-3">
+              <p className="text-xs text-[#7d8590]">
+                Upload the signed booking receipt from the client. This is required
+                before the sale can be finalized.
+              </p>
+              <KYCUploader
+                opportunityId={opportunity.id}
+                type="BOOKING_RECEIPT"
+                label="Booking Receipt"
+                description="Signed receipt confirming booking"
+                uploaded={opportunity.documents.some((d) => d.type === "BOOKING_RECEIPT")}
+                fileUrl={opportunity.documents.find((d) => d.type === "BOOKING_RECEIPT")?.fileUrl}
+                fileName={opportunity.documents.find((d) => d.type === "BOOKING_RECEIPT")?.fileName}
+              />
+            </div>
+          </AccordionSection>
+
+          {/* All Documents */}
           <AccordionSection
             id="documents"
             open={openSection === "documents"}
@@ -306,6 +283,7 @@ export function AmberStage({ contact, opportunity, session }: Props) {
           >
             <DocumentGallery documents={opportunity.documents} />
           </AccordionSection>
+
         </div>
       )}
     </div>
