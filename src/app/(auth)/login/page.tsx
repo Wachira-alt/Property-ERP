@@ -50,7 +50,7 @@ export default function LoginPage() {
         {/* Logo + brand */}
         <div className="mb-8 flex flex-col items-center gap-4">
           <Image
-            src="/company_logo.png"
+            src="/company_lo.png"
             alt="Lifestyle"
             width={72}
             height={72}
