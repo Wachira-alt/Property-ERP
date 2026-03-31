@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
 import {
   Users,
@@ -13,7 +14,6 @@ import {
   LogOut,
   Menu,
   X,
-  Building2,
   ChevronRight,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -30,53 +30,18 @@ type NavItem = {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  {
-    label: "Contacts",
-    href: "/contacts",
-    icon: Users,
-  },
-  {
-    label: "Inventory",
-    href: "/inventory",
-    icon: LayoutGrid,
-    requiredAction: "MANAGE_INVENTORY",
-  },
-  {
-    label: "Finance",
-    href: "/finance",
-    icon: Wallet,
-    requiredAction: "VIEW_FINANCE",
-  },
-  {
-    label: "Marketing",
-    href: "/marketing",
-    icon: Megaphone,
-    requiredAction: "SEND_CAMPAIGN",
-  },
+  { label: "Contacts",  href: "/contacts",  icon: Users },
+  { label: "Inventory", href: "/inventory", icon: LayoutGrid, requiredAction: "MANAGE_INVENTORY" },
+  { label: "Finance",   href: "/finance",   icon: Wallet,     requiredAction: "VIEW_FINANCE" },
+  { label: "Marketing", href: "/marketing", icon: Megaphone,  requiredAction: "SEND_CAMPAIGN" },
 ]
 
 const ADMIN_ITEMS: NavItem[] = [
-  {
-    label: "Team",
-    href: "/admin/team",
-    icon: UserCog,
-    requiredAction: "MANAGE_TEAM",
-  },
-  {
-    label: "Projects",
-    href: "/admin/projects",
-    icon: Settings,
-    requiredAction: "MANAGE_INVENTORY",
-  },
+  { label: "Team",     href: "/admin/team",     icon: UserCog,  requiredAction: "MANAGE_TEAM" },
+  { label: "Projects", href: "/admin/projects", icon: Settings, requiredAction: "MANAGE_INVENTORY" },
 ]
 
-function NavLink({
-  item,
-  onClick,
-}: {
-  item: NavItem
-  onClick?: () => void
-}) {
+function NavLink({ item, onClick }: { item: NavItem; onClick?: () => void }) {
   const pathname = usePathname()
   const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
   const Icon = item.icon
@@ -100,30 +65,17 @@ function NavLink({
         )}
       />
       <span>{item.label}</span>
-      {isActive && (
-        <ChevronRight size={14} className="ml-auto text-[#7d8590]" />
-      )}
+      {isActive && <ChevronRight size={14} className="ml-auto text-[#7d8590]" />}
     </Link>
   )
 }
 
-function SidebarContent({
-  user,
-  onNavigate,
-}: {
-  user: SessionUser
-  onNavigate?: () => void
-}) {
+function SidebarContent({ user, onNavigate }: { user: SessionUser; onNavigate?: () => void }) {
   const router = useRouter()
   const [loggingOut, setLoggingOut] = useState(false)
 
-  const visibleNav = NAV_ITEMS.filter(
-    (item) => !item.requiredAction || canPerform(user.role, item.requiredAction)
-  )
-
-  const visibleAdmin = ADMIN_ITEMS.filter(
-    (item) => !item.requiredAction || canPerform(user.role, item.requiredAction)
-  )
+  const visibleNav   = NAV_ITEMS.filter((item) => !item.requiredAction || canPerform(user.role, item.requiredAction))
+  const visibleAdmin = ADMIN_ITEMS.filter((item) => !item.requiredAction || canPerform(user.role, item.requiredAction))
 
   async function handleLogout() {
     setLoggingOut(true)
@@ -139,15 +91,21 @@ function SidebarContent({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Logo */}
+      {/* Logo + name — compact, GitHub style */}
       <div className="px-4 py-4 border-b border-[#21262d]">
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-md bg-[#1f6feb] flex items-center justify-center shrink-0">
-            <Building2 size={15} className="text-white" />
+          <div className="w-8 h-8 rounded-md overflow-hidden bg-white shrink-0 flex items-center justify-center">
+            <Image
+              src="/company_logo.png"
+              alt="Lifestyle"
+              width={28}
+              height={28}
+              className="object-contain"
+            />
           </div>
           <div className="min-w-0">
             <p className="text-sm font-semibold text-[#e6edf3] truncate leading-tight">
-              Property ERP
+              Lifestyle
             </p>
             <p className="text-[11px] text-[#7d8590] truncate leading-tight capitalize">
               {user.role.toLowerCase().replace("_", " ")}
@@ -162,7 +120,6 @@ function SidebarContent({
           <NavLink key={item.href} item={item} onClick={onNavigate} />
         ))}
 
-        {/* Admin section */}
         {visibleAdmin.length > 0 && (
           <>
             <div className="pt-4 pb-1 px-3">
@@ -186,12 +143,8 @@ function SidebarContent({
             </span>
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-medium text-[#e6edf3] truncate leading-tight">
-              {user.name}
-            </p>
-            <p className="text-[11px] text-[#7d8590] truncate leading-tight">
-              {user.email}
-            </p>
+            <p className="text-xs font-medium text-[#e6edf3] truncate leading-tight">{user.name}</p>
+            <p className="text-[11px] text-[#7d8590] truncate leading-tight">{user.email}</p>
           </div>
         </div>
 
@@ -221,14 +174,17 @@ export function Sidebar({ user }: { user: SessionUser }) {
       {/* ── Mobile top bar ──────────────────────────────── */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 h-14 bg-[#010409] border-b border-[#21262d]">
         <div className="flex items-center gap-2.5">
-          <div className="w-6 h-6 rounded-md bg-[#1f6feb] flex items-center justify-center">
-            <Building2 size={13} className="text-white" />
+          <div className="w-7 h-7 rounded-md overflow-hidden bg-white flex items-center justify-center shrink-0">
+            <Image
+              src="/company_logo.png"
+              alt="Lifestyle"
+              width={24}
+              height={24}
+              className="object-contain"
+            />
           </div>
-          <span className="text-sm font-semibold text-[#e6edf3]">
-            Property ERP
-          </span>
+          <span className="text-sm font-semibold text-[#e6edf3]">Lifestyle</span>
         </div>
-
         <button
           onClick={() => setMobileOpen(true)}
           className="p-1.5 rounded-md text-[#7d8590] hover:text-[#e6edf3] hover:bg-[#21262d] transition-colors"
@@ -243,20 +199,12 @@ export function Sidebar({ user }: { user: SessionUser }) {
 
       {/* ── Mobile drawer overlay ───────────────────────── */}
       {mobileOpen && (
-        <div
-          className="md:hidden fixed inset-0 z-50 flex"
-          role="dialog"
-          aria-modal="true"
-        >
-          {/* Backdrop */}
+        <div className="md:hidden fixed inset-0 z-50 flex" role="dialog" aria-modal="true">
           <div
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setMobileOpen(false)}
           />
-
-          {/* Drawer */}
           <div className="relative w-[240px] h-full bg-[#010409] border-r border-[#21262d] flex flex-col">
-            {/* Close button */}
             <div className="absolute top-3 right-3">
               <button
                 onClick={() => setMobileOpen(false)}
@@ -266,11 +214,7 @@ export function Sidebar({ user }: { user: SessionUser }) {
                 <X size={18} />
               </button>
             </div>
-
-            <SidebarContent
-              user={user}
-              onNavigate={() => setMobileOpen(false)}
-            />
+            <SidebarContent user={user} onNavigate={() => setMobileOpen(false)} />
           </div>
         </div>
       )}
