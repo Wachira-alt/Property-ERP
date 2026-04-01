@@ -3,9 +3,8 @@ import { getSession } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { getContacts } from "@/actions/contacts"
 import { AddContactModal } from "@/components/modals/AddContactModal"
-import { Users } from "lucide-react"
+import { Users, Search, ChevronRight } from "lucide-react"
 import Link from "next/link"
-import { formatDate } from "@/lib/utils"
 
 type Props = {
   searchParams: Promise<{ search?: string; stage?: string; projectId?: string }>
@@ -65,32 +64,31 @@ export default async function ContactsPage({ searchParams }: Props) {
     }),
   ])
 
-  // Filter by project from the global toolbar
   const contacts = projectId === "ALL" 
     ? allContacts 
     : allContacts.filter(c => c.projectId === projectId)
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {/* Page header */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold text-[#e6edf3]">Contacts</h1>
           <p className="text-sm text-[#7d8590] mt-0.5">
-            {contacts.length} contact{contacts.length !== 1 ? "s" : ""}
+            {contacts.length} lead{contacts.length !== 1 ? "s" : ""} in pipeline
           </p>
         </div>
         <AddContactModal projects={projects} agents={agents} units={units} />
       </div>
 
-      {/* Global Filters Toolbar */}
+      {/* Filters Toolbar */}
       <div className="space-y-3">
-        {/* Project Filter Row */}
-        <div className="flex items-center gap-0.5 bg-[#161b22] border border-[#30363d] rounded-lg p-1 overflow-x-auto scrollbar-hide">
+        {/* Horizontal Scrollable Project Filter */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
           <Link
             href={`/contacts?projectId=ALL&stage=${stage}${search ? `&search=${search}` : ""}`}
-            className={`shrink-0 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-              projectId === "ALL" ? "bg-[#21262d] text-[#e6edf3]" : "text-[#7d8590] hover:text-[#e6edf3]"
+            className={`shrink-0 px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+              projectId === "ALL" ? "bg-[#21262d] border-[#484f58] text-[#e6edf3]" : "border-[#30363d] text-[#7d8590] hover:text-[#e6edf3]"
             }`}
           >
             All Projects
@@ -99,8 +97,8 @@ export default async function ContactsPage({ searchParams }: Props) {
             <Link
               key={p.id}
               href={`/contacts?projectId=${p.id}&stage=${stage}${search ? `&search=${search}` : ""}`}
-              className={`shrink-0 px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
-                projectId === p.id ? "bg-[#21262d] text-[#e6edf3]" : "text-[#7d8590] hover:text-[#e6edf3]"
+              className={`shrink-0 px-3 py-1.5 rounded-md text-xs font-medium border transition-colors whitespace-nowrap ${
+                projectId === p.id ? "bg-[#21262d] border-[#484f58] text-[#e6edf3]" : "border-[#30363d] text-[#7d8590] hover:text-[#e6edf3]"
               }`}
             >
               {p.name}
@@ -108,15 +106,15 @@ export default async function ContactsPage({ searchParams }: Props) {
           ))}
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          {/* Stage filter tabs */}
-          <div className="flex items-center gap-0.5 bg-[#161b22] border border-[#30363d] rounded-lg p-1 overflow-x-auto">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          {/* Stage filter tabs (Scrollable on mobile) */}
+          <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-hide">
             {STAGE_TABS.map((tab) => (
               <Link
                 key={tab.value}
                 href={`/contacts?stage=${tab.value}&projectId=${projectId}${search ? `&search=${search}` : ""}`}
-                className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                  stage === tab.value ? "bg-[#21262d] text-[#e6edf3]" : "text-[#7d8590] hover:text-[#e6edf3]"
+                className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                  stage === tab.value ? "bg-[#21262d] border-[#484f58] text-[#e6edf3]" : "border-[#30363d] text-[#7d8590] hover:text-[#e6edf3]"
                 }`}
               >
                 {tab.value !== "ALL" && (
@@ -127,30 +125,31 @@ export default async function ContactsPage({ searchParams }: Props) {
             ))}
           </div>
 
-          {/* Search */}
-          <form method="GET" action="/contacts" className="flex gap-2">
+          {/* Search bar matching Finance UI */}
+          <form method="GET" action="/contacts" className="relative w-full lg:w-72">
+            <Search className="absolute left-2.5 top-2 text-[#7d8590]" size={14} />
             <input type="hidden" name="stage" value={stage} />
             <input type="hidden" name="projectId" value={projectId} />
             <input
               name="search"
               defaultValue={search}
-              placeholder="Search leads..."
-              className="w-full sm:w-64 h-8 px-3 text-sm bg-[#0d1117] border border-[#30363d] rounded-md text-[#e6edf3] placeholder:text-[#484f58] focus:outline-none focus:border-[#1f6feb]"
+              placeholder="Search by name or phone..."
+              className="w-full h-8 pl-8 pr-3 text-sm bg-[#0d1117] border border-[#30363d] rounded-md text-[#e6edf3] placeholder:text-[#484f58] focus:outline-none focus:border-[#1f6feb] transition-colors"
             />
           </form>
         </div>
       </div>
 
-      {/* Table with contacts */}
+      {/* Contacts List */}
       {contacts.length === 0 ? (
-        <div className="border border-dashed border-[#30363d] rounded-lg py-16 text-center">
+        <div className="border border-dashed border-[#30363d] rounded-lg py-20 text-center bg-[#161b22]/30">
           <Users size={32} className="mx-auto text-[#484f58] mb-3" />
-          <p className="text-sm font-medium text-[#e6edf3]">No contacts found</p>
+          <p className="text-sm font-medium text-[#7d8590]">No leads found matching these criteria</p>
         </div>
       ) : (
         <div className="border border-[#30363d] rounded-lg overflow-hidden">
-          {/* Table header — strictly matching your original grid */}
-          <div className="hidden sm:grid grid-cols-[1fr_140px_140px_120px_100px] gap-4 px-4 py-2.5 bg-[#161b22] border-b border-[#30363d]">
+          {/* Desktop Table Header */}
+          <div className="hidden md:grid grid-cols-[1fr_140px_140px_120px_110px] gap-4 px-4 py-2.5 bg-[#161b22] border-b border-[#30363d]">
             <span className="text-xs font-medium text-[#7d8590]">Contact</span>
             <span className="text-xs font-medium text-[#7d8590]">Project</span>
             <span className="text-xs font-medium text-[#7d8590]">Agent</span>
@@ -163,28 +162,41 @@ export default async function ContactsPage({ searchParams }: Props) {
               const opp = contact.opportunity
               const stageKey = (opp?.stage ?? "GREEN") as Stage
               const style = STAGE_STYLES[stageKey]
+              
               return (
                 <Link
                   key={contact.id}
                   href={`/contacts/${contact.id}`}
-                  className="flex flex-col sm:grid sm:grid-cols-[1fr_140px_140px_120px_100px] gap-2 sm:gap-4 px-4 py-3.5 bg-[#0d1117] hover:bg-[#161b22] transition-colors group"
+                  className="flex flex-col md:grid md:grid-cols-[1fr_140px_140px_120px_110px] gap-2 md:gap-4 px-4 py-3.5 bg-[#0d1117] hover:bg-[#161b22] transition-colors group relative"
                 >
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-[#e6edf3] group-hover:text-[#58a6ff] transition-colors truncate">
-                      {contact.firstName} {contact.lastName}
-                    </p>
-                    <p className="text-xs text-[#7d8590] mt-0.5">{contact.phone}</p>
+                  {/* Contact Primary Info */}
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className="flex flex-col min-w-0">
+                      <p className="text-xs font-semibold text-[#58a6ff] group-hover:underline truncate transition-colors">
+                        {contact.firstName} {contact.lastName}
+                      </p>
+                      <p className="text-[10px] text-[#7d8590] mt-0.5">{contact.phone}</p>
+                      {/* Mobile-only sub-info */}
+                      <p className="md:hidden text-[10px] text-[#484f58] mt-1 truncate">
+                        {contact.project.name} · {opp?.unit?.name ?? "No Unit"}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex items-center text-xs text-[#e6edf3] truncate">{contact.project.name}</div>
-                  <div className="flex items-center text-xs text-[#7d8590] truncate">{contact.agent.name}</div>
-                  <div className="flex items-center text-xs text-[#7d8590] truncate">
+
+                  {/* Desktop Only Columns */}
+                  <div className="hidden md:flex items-center text-xs text-[#e6edf3] truncate">{contact.project.name}</div>
+                  <div className="hidden md:flex items-center text-xs text-[#7d8590] truncate">{contact.agent.name}</div>
+                  <div className="hidden md:flex items-center text-xs text-[#7d8590] truncate">
                     {opp?.unit?.name ?? <span className="text-[#484f58] italic">Unassigned</span>}
                   </div>
-                  <div className="flex items-center">
+
+                  {/* Stage Badge - Sticky to right on mobile */}
+                  <div className="flex items-center absolute right-4 top-1/2 -translate-y-1/2 md:static md:translate-y-0">
                     <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium border ${style.badge}`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
                       {style.label}
                     </span>
+                    <ChevronRight size={14} className="ml-2 text-[#30363d] md:hidden" />
                   </div>
                 </Link>
               )

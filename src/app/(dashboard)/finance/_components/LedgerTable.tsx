@@ -5,8 +5,7 @@ import { PaymentRowAction } from "./PaymentRowAction"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { canPerform } from "@/lib/permissions"
 import type { SessionUser } from "@/types/auth"
-import { AlertCircle, ChevronRight, ChevronDown } from "lucide-react"
-import Link from "next/link"
+import { AlertCircle, ChevronRight, ChevronDown, FileText } from "lucide-react"
 import { DownloadBtn } from "@/components/shared/DownloadBtn"
 
 type LedgerEntry = {
@@ -58,14 +57,14 @@ export function LedgerTable({ groups, session }: Props) {
 
   return (
     <div className="border border-[#30363d] rounded-lg overflow-hidden">
-      {/* Header exactly as your original */}
+      {/* Desktop Header */}
       <div className="hidden md:grid grid-cols-[1fr_130px_120px_100px_120px_110px] gap-4 px-4 py-2.5 bg-[#161b22] border-b border-[#30363d]">
         <span className="text-xs font-medium text-[#7d8590]">Client / Description</span>
         <span className="text-xs font-medium text-[#7d8590]">Unit</span>
         <span className="text-xs font-medium text-[#7d8590]">Total Amount</span>
-        <span className="text-xs font-medium text-[#7d8590]">Installments</span>
+        <span className="text-xs font-medium text-[#7d8590]">Items</span>
         <span className="text-xs font-medium text-[#7d8590]">Status</span>
-        {canMarkPaid && <span className="text-xs font-medium text-[#7d8590]">Action</span>}
+        <span className="text-xs font-medium text-[#7d8590]">Actions</span>
       </div>
 
       <div className="divide-y divide-[#21262d]">
@@ -73,35 +72,42 @@ export function LedgerTable({ groups, session }: Props) {
           const isExpanded = expandedIds.has(group.opportunityId)
           const hasOverdue = group.entries.some(e => e.status === "PENDING" && new Date(e.dueDate) < new Date())
           const isFullyPaid = group.totalPaid >= group.totalAmount
+          const contactName = `${group.contact.firstName} ${group.contact.lastName}`
 
           return (
             <div key={group.opportunityId} className="flex flex-col">
               {/* Group Summary Row */}
               <div 
-                onClick={() => toggleExpand(group.opportunityId)}
-                className="flex flex-col md:grid md:grid-cols-[1fr_130px_120px_100px_120px_110px] gap-2 md:gap-4 px-4 py-3.5 bg-[#0d1117] hover:bg-[#161b22] transition-colors cursor-pointer group"
+                className="flex flex-col md:grid md:grid-cols-[1fr_130px_120px_100px_120px_110px] gap-2 md:gap-4 px-4 py-3.5 bg-[#0d1117] hover:bg-[#161b22] transition-colors group relative"
               >
-                <div className="flex items-center gap-3 min-w-0">
+                {/* Mobile/Tablet Clickable area for expansion */}
+                <div 
+                  onClick={() => toggleExpand(group.opportunityId)}
+                  className="flex items-center gap-3 min-w-0 cursor-pointer"
+                >
                   <div className="text-[#484f58] group-hover:text-[#e6edf3]">
                     {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                   </div>
-                  <span className="text-xs font-semibold text-[#58a6ff] truncate">
-                    {group.contact.firstName} {group.contact.lastName}
-                  </span>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-xs font-semibold text-[#58a6ff] truncate">
+                      {contactName}
+                    </span>
+                    <span className="md:hidden text-[10px] text-[#7d8590] truncate">
+                      {group.unit?.name ?? "No Unit"} · {group.entries.length} items
+                    </span>
+                  </div>
                 </div>
 
+                {/* Desktop Columns */}
                 <div className="hidden md:flex items-center text-xs text-[#7d8590]">
                   {group.unit?.name ?? "—"}
                 </div>
-
                 <div className="hidden md:flex items-center text-xs font-semibold text-[#e6edf3]">
                   {formatCurrency(group.totalAmount)}
                 </div>
-
                 <div className="hidden md:flex items-center text-xs text-[#7d8590]">
                   {group.entries.length} items
                 </div>
-
                 <div className="hidden md:flex items-center">
                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${
                      hasOverdue ? STATUS_STYLES.OVERDUE : isFullyPaid ? STATUS_STYLES.PAID : STATUS_STYLES.PENDING
@@ -109,9 +115,20 @@ export function LedgerTable({ groups, session }: Props) {
                      {hasOverdue ? "OVERDUE" : isFullyPaid ? "FULLY PAID" : "PARTIAL"}
                    </span>
                 </div>
+
+                {/* Actions Column (Download Statement) */}
+                <div className="flex items-center gap-2 md:static absolute right-4 top-3.5">
+                  <DownloadBtn
+                    url={`/api/documents/statement?contactId=${group.contact.id}`}
+                    fileName={`statement-${contactName.replace(/\s+/g, "-")}.pdf`}
+                    label="Statement"
+                    variant="ghost"
+                    className="h-7 text-[10px] md:text-xs"
+                  />
+                </div>
               </div>
 
-              {/* Nested Entries - Strict adherence to your nested style */}
+              {/* Nested Installment Entries */}
               {isExpanded && (
                 <div className="bg-[#090c10] divide-y divide-[#21262d] border-t border-[#30363d]">
                   {group.entries.map((entry) => {

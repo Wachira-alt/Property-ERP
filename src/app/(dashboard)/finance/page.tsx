@@ -3,18 +3,15 @@ import { getSession } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { canPerform } from "@/lib/permissions"
 import { LedgerTable } from "./_components/LedgerTable"
-import { StatementView } from "./_components/StatementView"
-import { Wallet, FileText } from "lucide-react"
+import { Wallet, Info } from "lucide-react"
 import Link from "next/link"
 import { formatCurrency } from "@/lib/utils"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 type FilterStatus = "ALL" | "PENDING" | "PAID" | "OVERDUE"
 
 type Props = {
   searchParams: Promise<{
     status?:    string
-    view?:      string
     contactId?: string
   }>
 }
@@ -26,9 +23,9 @@ export default async function FinancePage({ searchParams }: Props) {
 
   const params    = await searchParams
   const status    = (params.status ?? "ALL") as FilterStatus
-  const view      = params.view ?? "ledger"
   const contactId = params.contactId
 
+  // Fetch entries with necessary relations
   const entries = await prisma.ledgerEntry.findMany({
     where: {
       ...(status !== "ALL" && status !== "OVERDUE" && { status }),
@@ -49,13 +46,13 @@ export default async function FinancePage({ searchParams }: Props) {
 
   const now = new Date()
   
-  // Stats - Restored exactly as you had them
+  // Stats calculation
   const totalScheduled = entries.reduce((s, e) => s + Number(e.amount), 0)
   const totalPaid      = entries.filter((e) => e.status === "PAID").reduce((s, e) => s + Number(e.amount), 0)
   const totalPending   = entries.filter((e) => e.status === "PENDING").reduce((s, e) => s + Number(e.amount), 0)
   const totalOverdue   = entries.filter((e) => e.status === "PENDING" && new Date(e.dueDate) < now).reduce((s, e) => s + Number(e.amount), 0)
 
-  // Grouping logic for the LedgerTable
+  // Group entries by Contact for the LedgerTable
   const groupsMap = new Map<string, any>()
   entries.forEach((entry) => {
     const key = entry.opportunity.contact.id
@@ -83,12 +80,29 @@ export default async function FinancePage({ searchParams }: Props) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-[#e6edf3]">Finance</h1>
-        <p className="text-sm text-[#7d8590] mt-0.5">Payment ledger and statements of account</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold text-[#e6edf3]">Finance</h1>
+          <p className="text-sm text-[#7d8590] mt-0.5">Manage payment ledgers and generate statements</p>
+        </div>
+        
+        {/* Status filters - Mobile friendly scroll if needed */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-2 sm:pb-0">
+          {["ALL", "PENDING", "PAID", "OVERDUE"].map((s) => (
+            <Link
+              key={s}
+              href={`/finance?${s !== "ALL" ? `status=${s}` : ""}`}
+              className={`text-xs px-3 py-1.5 rounded-md border whitespace-nowrap transition-colors ${
+                status === s ? "bg-[#21262d] border-[#484f58] text-[#e6edf3]" : "border-[#30363d] text-[#7d8590] hover:text-[#e6edf3]"
+              }`}
+            >
+              {s === "ALL" ? "All" : s.charAt(0) + s.slice(1).toLowerCase()}
+            </Link>
+          ))}
+        </div>
       </div>
 
-      {/* Summary cards - Restored color and labels */}
+      {/* Summary cards - Responsive 2x2 or 4x1 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { label: "Total scheduled", value: formatCurrency(totalScheduled), color: "text-[#e6edf3]" },
@@ -97,46 +111,34 @@ export default async function FinancePage({ searchParams }: Props) {
           { label: "Overdue", value: formatCurrency(totalOverdue), color: "text-[#f85149]" },
         ].map((card) => (
           <div key={card.label} className="border border-[#30363d] rounded-lg bg-[#161b22] px-4 py-3.5">
-            <p className="text-[11px] text-[#7d8590]">{card.label}</p>
+            <p className="text-[11px] text-[#7d8590] uppercase tracking-wider">{card.label}</p>
             <p className={`text-lg font-semibold mt-1 ${card.color}`}>{card.value}</p>
           </div>
         ))}
       </div>
 
-      <Tabs defaultValue={view} className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <TabsList className="bg-[#161b22] border border-[#30363d] p-1 h-auto">
-            <TabsTrigger value="ledger" className="data-[state=active]:bg-[#21262d] text-xs px-4 py-1.5">
-              <Wallet size={13} className="mr-1.5" /> Ledger
-            </TabsTrigger>
-            <TabsTrigger value="statements" className="data-[state=active]:bg-[#21262d] text-xs px-4 py-1.5">
-              <FileText size={13} className="mr-1.5" /> Statements
-            </TabsTrigger>
-          </TabsList>
-
-          <div className="flex items-center gap-1.5">
-            {["ALL", "PENDING", "PAID", "OVERDUE"].map((s) => (
-              <Link
-                key={s}
-                href={`/finance?view=${view}${s !== "ALL" ? `&status=${s}` : ""}`}
-                className={`text-xs px-3 py-1.5 rounded-md border transition-colors ${
-                  status === s ? "bg-[#21262d] border-[#484f58] text-[#e6edf3]" : "border-[#30363d] text-[#7d8590] hover:text-[#e6edf3]"
-                }`}
-              >
-                {s === "ALL" ? "All" : s.charAt(0) + s.slice(1).toLowerCase()}
-              </Link>
-            ))}
-          </div>
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 text-[#7d8590]">
+          <Wallet size={14} />
+          <h2 className="text-sm font-medium">Payment Ledger</h2>
         </div>
 
-        <TabsContent value="ledger" className="mt-0">
-          <LedgerTable groups={groupedData} session={session} />
-        </TabsContent>
+        {/* The LedgerTable now handles everything:
+           1. Expanding rows to see individual payments
+           2. "Mark Paid" actions via PaymentRowAction
+           3. "Download Statement" for the whole group
+        */}
+        <LedgerTable groups={groupedData} session={session} />
+      </div>
 
-        <TabsContent value="statements" className="mt-0 space-y-4">
-           {/* Statement logic remains same */}
-        </TabsContent>
-      </Tabs>
+      {/* Helper Footer */}
+      {/* <div className="flex items-start gap-2 p-3 rounded-md bg-[#0d1117] border border-[#30363d]">
+        <Info size={14} className="text-[#58a6ff] mt-0.5 shrink-0" />
+        <p className="text-[11px] text-[#7d8590] leading-relaxed">
+          Click on a client row to view detailed installment breakdowns. 
+          Statements can be downloaded directly from the client row action menu.
+        </p>
+      </div> */}
     </div>
   )
 }
