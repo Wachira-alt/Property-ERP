@@ -249,10 +249,29 @@ model ReservationExtension {
 model Campaign {
   id        String   @id @default(cuid())
   subject   String
-  body      String
+  body      String   @db.Text
+  audience  String   @default("ALL")
   sentAt    DateTime?
+  sentCount Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  attachments CampaignAttachment[]
+
   @@map("campaigns")
+}
+
+model CampaignAttachment {
+  id         String   @id @default(cuid())
+  campaignId String
+  fileName   String
+  fileUrl    String
+  fileKey    String
+  mimeType   String
+  createdAt  DateTime @default(now())
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@map("campaign_attachments")
 }
