@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { jwtVerify } from "jose"
 
-const PROTECTED_PREFIX = ["/contacts", "/finance", "/inventory", "/admin", "/marketing"]
+const PROTECTED_PREFIX = ["/contacts", "/finance", "/inventory", "/admin", "/marketing","/dashboard" ]
 const PUBLIC_ROUTES = ["/login"]
 
 async function verifySession(token: string) {

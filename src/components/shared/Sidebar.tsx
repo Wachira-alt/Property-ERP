@@ -21,6 +21,7 @@ import { toast } from "sonner"
 import type { SessionUser } from "@/types/auth"
 import type { Action } from "@/lib/permissions"
 import { canPerform } from "@/lib/permissions"
+import { LayoutDashboard } from "lucide-react"
 
 type NavItem = {
   label: string
@@ -30,10 +31,17 @@ type NavItem = {
 }
 
 const NAV_ITEMS: NavItem[] = [
+  {
+    label: "Dashboard",
+    href:  "/dashboard",
+    icon:  LayoutDashboard,
+    requiredAction: "EXTEND_RESERVATION", // GM + Admin only
+  },
   { label: "Contacts",  href: "/contacts",  icon: Users },
   { label: "Inventory", href: "/inventory", icon: LayoutGrid, requiredAction: "MANAGE_INVENTORY" },
   { label: "Finance",   href: "/finance",   icon: Wallet,     requiredAction: "VIEW_FINANCE" },
   { label: "Marketing", href: "/marketing", icon: Megaphone,  requiredAction: "SEND_CAMPAIGN" },
+  
 ]
 
 const ADMIN_ITEMS: NavItem[] = [
