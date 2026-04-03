@@ -93,7 +93,7 @@ export default async function DashboardPage() {
             {[
               {
                 stage: "GREEN",
-                label: "Leads",
+                label: "Green",
                 count: d.pipeline.green,
                 color: "bg-[#3fb950]",
                 bg:    "bg-[#1a4f2a]",
@@ -101,7 +101,7 @@ export default async function DashboardPage() {
               },
               {
                 stage: "AMBER",
-                label: "Reservations",
+                label: "Amber",
                 count: d.pipeline.amber,
                 color: "bg-[#d29922]",
                 bg:    "bg-[#4a3000]",
@@ -416,7 +416,7 @@ export default async function DashboardPage() {
             </div>
 
             {/* Recent payments */}
-            {d.recentPayments.length > 0 && (
+            {/* {d.recentPayments.length > 0 && (
               <div className="space-y-2">
                 <p className="text-[11px] font-medium text-[#7d8590] uppercase tracking-wider">
                   Recent payments (7 days)
@@ -441,7 +441,7 @@ export default async function DashboardPage() {
                   ))}
                 </div>
               </div>
-            )}
+            )} */}
           </div>
         </div>
       </div>
