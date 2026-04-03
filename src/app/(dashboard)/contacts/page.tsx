@@ -28,7 +28,7 @@ const STAGE_TABS = [
   { value: "CLOSED",    label: "Closed"    },
   { value: "PAST",      label: "Past"      },
   { value: "EXPIRED",   label: "Expired"   },
-  { value: "CANCELLED", label: "Cancelled" },
+  // { value: "CANCELLED", label: "Cancelled" },
 ]
 
 export default async function ContactsPage({ searchParams }: Props) {

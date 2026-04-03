@@ -129,9 +129,9 @@ function AgentRow({
               isExpanded && "rotate-90 text-[#58a6ff]"
             )}
           />
-          <div className="w-7 h-7 rounded-full bg-[#1c2128] border border-[#30363d] flex items-center justify-center text-[10px] font-semibold text-[#7d8590] shrink-0 tracking-wide">
+          {/* <div className="w-7 h-7 rounded-full bg-[#1c2128] border border-[#30363d] flex items-center justify-center text-[10px] font-semibold text-[#7d8590] shrink-0 tracking-wide">
             {initials}
-          </div>
+          </div> */}
           <div className="min-w-0">
             <p className="text-[13px] font-medium text-[#e6edf3] truncate leading-snug">{member.name}</p>
             <p className="text-[10px] text-[#484f58] leading-snug capitalize">{displayRole}</p>
