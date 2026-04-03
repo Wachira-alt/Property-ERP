@@ -9,6 +9,7 @@ import {
   Activity, Target,
 } from "lucide-react"
 import Link from "next/link"
+import { TeamPerformanceTable } from "./_components/TeamPerformanceTable"
 
 export default async function DashboardPage() {
   const session = await getSession()
@@ -445,112 +446,17 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Row 4: Team performance ───────────────────────────────────────── */}
-      <div className="border border-[#30363d] rounded-lg bg-[#161b22] overflow-hidden">
-        <SectionHeader
-          title="Team performance"
-          sub="Ranked by closed deals"
-          href="/admin/team"
-          icon={<UserCheck size={13} className="text-[#58a6ff]" />}
-        />
-        {d.team.length === 0 ? (
-          <div className="px-5 py-10 text-center">
-            <Users size={20} className="mx-auto text-[#484f58] mb-2" />
-            <p className="text-xs text-[#7d8590]">No team activity yet</p>
-          </div>
-        ) : (
-          <div className="divide-y divide-[#21262d]">
-            {/* Header */}
-            <div className="hidden sm:grid grid-cols-[1fr_100px_100px_100px_120px_80px] gap-4 px-5 py-2 bg-[#0d1117]">
-              {["Agent", "Total leads", "In amber", "Closed", "Conversion", ""].map(
-                (h) => (
-                  <span key={h} className="text-[10px] font-medium text-[#484f58] uppercase tracking-wider">
-                    {h}
-                  </span>
-                )
-              )}
-            </div>
-
-            {d.team.map((member, idx) => (
-              <div
-                key={member.id}
-                className="flex flex-col sm:grid sm:grid-cols-[1fr_100px_100px_100px_120px_80px] gap-2 sm:gap-4 px-5 py-3.5 bg-[#0d1117] hover:bg-[#161b22] transition-colors"
-              >
-                {/* Agent */}
-                <div className="flex items-center gap-2.5 min-w-0">
-                  {/* Rank */}
-                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
-                    idx === 0
-                      ? "bg-[#d29922] text-[#0d1117]"
-                      : idx === 1
-                      ? "bg-[#7d8590] text-[#0d1117]"
-                      : idx === 2
-                      ? "bg-[#9e6a03] text-[#0d1117]"
-                      : "bg-[#21262d] text-[#484f58]"
-                  }`}>
-                    {idx + 1}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-[#e6edf3] truncate">
-                      {member.name}
-                    </p>
-                    <p className="text-[10px] text-[#484f58] capitalize">
-                      {member.role.toLowerCase().replace("_", " ")}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Total leads */}
-                <div className="flex items-center">
-                  <span className="text-xs text-[#e6edf3]">{member.total}</span>
-                </div>
-
-                {/* Amber */}
-                <div className="flex items-center">
-                  <span className="text-xs text-[#d29922]">{member.amber}</span>
-                </div>
-
-                {/* Closed */}
-                <div className="flex items-center">
-                  <span className="text-xs text-[#3fb950] font-medium">
-                    {member.closed}
-                  </span>
-                </div>
-
-                {/* Conversion bar */}
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 h-1.5 bg-[#21262d] rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${
-                        member.conversion >= 30
-                          ? "bg-[#3fb950]"
-                          : member.conversion >= 15
-                          ? "bg-[#d29922]"
-                          : "bg-[#f85149]"
-                      }`}
-                      style={{ width: `${Math.min(member.conversion, 100)}%` }}
-                    />
-                  </div>
-                  <span className="text-[10px] text-[#7d8590] w-7 text-right">
-                    {member.conversion}%
-                  </span>
-                </div>
-
-                {/* Activity indicator */}
-                <div className="flex items-center">
-                  <div className="flex items-center gap-1">
-                    <Activity size={11} className="text-[#484f58]" />
-                    <span className="text-[10px] text-[#484f58]">
-                      {member.total > 0 ? "Active" : "Idle"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
+    
+{/* ── Row 4: Team performance ───────────────────────────────────────── */}
+<div className="border border-[#30363d] rounded-lg bg-[#161b22] overflow-hidden">
+  <SectionHeader
+    title="Team performance"
+    sub={`${d.team.length} active agent${d.team.length !== 1 ? "s" : ""} · ranked by deals closed`}
+    href="/admin/team"
+    icon={<UserCheck size={13} className="text-[#58a6ff]" />}
+  />
+  <TeamPerformanceTable team={d.team} />
+</div>
     </div>
   )
 }

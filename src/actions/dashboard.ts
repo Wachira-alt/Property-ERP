@@ -189,28 +189,30 @@ export async function getDashboardData() {
 
   // ── Process team performance ────────────────────────────────────────────
   const team = teamPerformance
-    .map((user) => {
-      const contacts = user.assignedContacts
-      const closed   = contacts.filter(
-        (c) => c.opportunity?.stage === "CLOSED" || c.opportunity?.stage === "PAST"
-      ).length
-      const amber    = contacts.filter(
-        (c) => c.opportunity?.stage === "AMBER"
-      ).length
-      return {
-        id:       user.id,
-        name:     user.name,
-        role:     user.role,
-        total:    user._count.assignedContacts,
-        closed,
-        amber,
-        conversion: user._count.assignedContacts > 0
-          ? Math.round((closed / user._count.assignedContacts) * 100)
-          : 0,
-      }
-    })
-    .filter((u) => u.total > 0)
-    .sort((a, b) => b.closed - a.closed)
+  .map((user) => {
+    const contacts = user.assignedContacts
+    const green    = contacts.filter((c) => c.opportunity?.stage === "GREEN").length
+    const amber    = contacts.filter((c) => c.opportunity?.stage === "AMBER").length
+    const closed   = contacts.filter((c) => c.opportunity?.stage === "CLOSED").length
+    const past     = contacts.filter((c) => c.opportunity?.stage === "PAST").length
+    const total    = user._count.assignedContacts
+
+    return {
+      id:   user.id,
+      name: user.name,
+      role: user.role,
+      total,
+      green,
+      amber,
+      closed,
+      past,
+      conversion: total > 0
+        ? Math.round(((closed + past) / total) * 100)
+        : 0,
+    }
+  })
+  .filter((u) => u.total > 0)
+  .sort((a, b) => (b.closed + b.past) - (a.closed + a.past))
 
   // ── Process lead intake trend (30 days, weekly buckets) ─────────────────
   const weeks: { label: string; count: number }[] = []
