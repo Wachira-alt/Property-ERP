@@ -181,30 +181,34 @@ export function Sidebar({ user }: { user: SessionUser }) {
       </aside>
 
       {/* ── Mobile top bar ──────────────────────────────── */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 h-14 bg-[#010409] border-b border-[#21262d]">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-md overflow-hidden bg-white flex items-center justify-center shrink-0">
-            <Image
-              src="/company_lo.png"
-              alt="Lifestyle"
-              width={24}
-              height={24}
-              className="object-contain"
-            />
-          </div>
-          <span className="text-sm font-semibold text-[#e6edf3]">Lifestyle</span>
-        </div>
-        <button
-          onClick={() => setMobileOpen(true)}
-          className="p-1.5 rounded-md text-[#7d8590] hover:text-[#e6edf3] hover:bg-[#21262d] transition-colors"
-          aria-label="Open menu"
-        >
-          <Menu size={20} />
-        </button>
+<div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-[#010409] border-b border-[#21262d]"
+  style={{ paddingTop: 'env(safe-area-inset-top)' }}
+>
+  <div className="flex items-center justify-between px-4 h-14">
+    <div className="flex items-center gap-2.5">
+      <div className="w-7 h-7 rounded-md overflow-hidden bg-white flex items-center justify-center shrink-0">
+        <Image
+          src="/company_lo.png"
+          alt="Lifestyle"
+          width={24}
+          height={24}
+          className="object-contain"
+        />
       </div>
+      <span className="text-sm font-semibold text-[#e6edf3]">Lifestyle</span>
+    </div>
+    <button
+      onClick={() => setMobileOpen(true)}
+      className="p-1.5 rounded-md text-[#7d8590] hover:text-[#e6edf3] hover:bg-[#21262d] transition-colors"
+      aria-label="Open menu"
+    >
+      <Menu size={20} />
+    </button>
+  </div>
+</div>
 
-      {/* Mobile top bar spacer */}
-      <div className="md:hidden h-14" />
+{/* Mobile top bar spacer */}
+<div className="md:hidden h-14" style={{ marginTop: 'env(safe-area-inset-top)' }} />
 
       {/* ── Mobile drawer overlay ───────────────────────── */}
       {mobileOpen && (
