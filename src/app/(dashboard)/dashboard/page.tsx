@@ -487,15 +487,15 @@ function KPICard({
   }
 
   return (
-    <div className={`border ${borders[accent]} rounded-lg bg-[#161b22] px-4 py-4`}>
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-[11px] text-[#7d8590]">{label}</p>
-        {icon}
+    <div className={`border ${borders[accent]} rounded-lg bg-[#161b22] px-4 py-4 min-w-0`}>
+      <div className="flex items-center justify-between mb-3 gap-2">
+        <p className="text-[11px] text-[#7d8590] leading-snug">{label}</p>
+        <span className="shrink-0">{icon}</span>
       </div>
-      <p className="text-2xl font-semibold text-[#e6edf3] leading-none">
+      <p className="text-xl sm:text-2xl font-semibold text-[#e6edf3] leading-tight break-words">
         {value}
       </p>
-      <p className="text-[11px] text-[#484f58] mt-1.5">{sub}</p>
+      <p className="text-[11px] text-[#484f58] mt-1.5 leading-snug">{sub}</p>
     </div>
   )
 }
