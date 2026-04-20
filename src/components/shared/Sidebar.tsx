@@ -36,13 +36,12 @@ const NAV_ITEMS: NavItem[] = [
     label: "Dashboard",
     href:  "/dashboard",
     icon:  LayoutDashboard,
-    requiredAction: "EXTEND_RESERVATION", // GM + Admin only
+    requiredAction: "EXTEND_RESERVATION",
   },
   { label: "Contacts",  href: "/contacts",  icon: Users },
   { label: "Inventory", href: "/inventory", icon: LayoutGrid, requiredAction: "MANAGE_INVENTORY" },
   { label: "Finance",   href: "/finance",   icon: Wallet,     requiredAction: "VIEW_FINANCE" },
   { label: "Marketing", href: "/marketing", icon: Megaphone,  requiredAction: "SEND_CAMPAIGN" },
-  
 ]
 
 const ADMIN_ITEMS: NavItem[] = [
@@ -100,7 +99,7 @@ function SidebarContent({ user, onNavigate }: { user: SessionUser; onNavigate?: 
 
   return (
     <div className="flex flex-col h-full">
-      {/* Logo + name — compact, GitHub style */}
+      {/* Logo */}
       <div className="px-4 py-4 border-b border-[#21262d]">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-md overflow-hidden bg-white shrink-0 flex items-center justify-center">
@@ -143,8 +142,11 @@ function SidebarContent({ user, onNavigate }: { user: SessionUser; onNavigate?: 
         )}
       </nav>
 
-      {/* User footer */}
-      <div className="border-t border-[#21262d] px-3 py-3 space-y-0.5">
+      {/* User footer — safe area bottom so home indicator doesn't cover it */}
+      <div
+        className="border-t border-[#21262d] px-3 py-3 space-y-0.5"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
+      >
         <div className="flex items-center gap-3 px-3 py-2 rounded-md">
           <div className="w-6 h-6 rounded-full bg-[#1f6feb] flex items-center justify-center shrink-0">
             <span className="text-[11px] font-semibold text-white">
@@ -176,39 +178,49 @@ export function Sidebar({ user }: { user: SessionUser }) {
   return (
     <>
       {/* ── Desktop sidebar ─────────────────────────────── */}
-      <aside className="hidden md:flex fixed left-0 top-0 h-screen w-[240px] flex-col bg-[#010409] border-r border-[#21262d] z-40">
+      <aside
+        className="hidden md:flex fixed left-0 top-0 h-screen w-[240px] flex-col bg-[#010409] border-r border-[#21262d] z-40"
+        style={{
+          paddingTop: 'env(safe-area-inset-top)',
+          paddingBottom: 'env(safe-area-inset-bottom)',
+        }}
+      >
         <SidebarContent user={user} />
       </aside>
 
       {/* ── Mobile top bar ──────────────────────────────── */}
-<div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-[#010409] border-b border-[#21262d]"
-  style={{ paddingTop: 'env(safe-area-inset-top)' }}
->
-  <div className="flex items-center justify-between px-4 h-14">
-    <div className="flex items-center gap-2.5">
-      <div className="w-7 h-7 rounded-md overflow-hidden bg-white flex items-center justify-center shrink-0">
-        <Image
-          src="/company_lo.png"
-          alt="Lifestyle"
-          width={24}
-          height={24}
-          className="object-contain"
-        />
+      <div
+        className="md:hidden fixed top-0 left-0 right-0 z-40 bg-[#010409] border-b border-[#21262d]"
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}
+      >
+        <div className="flex items-center justify-between px-4 h-14">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-md overflow-hidden bg-white flex items-center justify-center shrink-0">
+              <Image
+                src="/company_lo.png"
+                alt="Lifestyle"
+                width={24}
+                height={24}
+                className="object-contain"
+              />
+            </div>
+            <span className="text-sm font-semibold text-[#e6edf3]">Lifestyle</span>
+          </div>
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="p-1.5 rounded-md text-[#7d8590] hover:text-[#e6edf3] hover:bg-[#21262d] transition-colors"
+            aria-label="Open menu"
+          >
+            <Menu size={20} />
+          </button>
+        </div>
       </div>
-      <span className="text-sm font-semibold text-[#e6edf3]">Lifestyle</span>
-    </div>
-    <button
-      onClick={() => setMobileOpen(true)}
-      className="p-1.5 rounded-md text-[#7d8590] hover:text-[#e6edf3] hover:bg-[#21262d] transition-colors"
-      aria-label="Open menu"
-    >
-      <Menu size={20} />
-    </button>
-  </div>
-</div>
 
-{/* Mobile top bar spacer */}
-<div className="md:hidden h-14" style={{ marginTop: 'env(safe-area-inset-top)' }} />
+      {/* Mobile top bar spacer — h-14 + status bar height */}
+      <div
+        className="md:hidden h-14"
+        style={{ marginTop: 'env(safe-area-inset-top)' }}
+      />
 
       {/* ── Mobile drawer overlay ───────────────────────── */}
       {mobileOpen && (
@@ -217,8 +229,17 @@ export function Sidebar({ user }: { user: SessionUser }) {
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setMobileOpen(false)}
           />
-          <div className="relative w-[240px] h-full bg-[#010409] border-r border-[#21262d] flex flex-col">
-            <div className="absolute top-3 right-3">
+          <div
+            className="relative w-[240px] h-full bg-[#010409] border-r border-[#21262d] flex flex-col"
+            style={{
+              paddingTop: 'env(safe-area-inset-top)',
+              paddingBottom: 'env(safe-area-inset-bottom)',
+            }}
+          >
+            <div
+              className="absolute right-3"
+              style={{ top: 'calc(env(safe-area-inset-top) + 12px)' }}
+            >
               <button
                 onClick={() => setMobileOpen(false)}
                 className="p-1.5 rounded-md text-[#7d8590] hover:text-[#e6edf3] hover:bg-[#21262d] transition-colors"
