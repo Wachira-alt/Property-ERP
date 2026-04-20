@@ -105,7 +105,7 @@ function SidebarContent({ user, onNavigate }: { user: SessionUser; onNavigate?: 
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-md overflow-hidden bg-white shrink-0 flex items-center justify-center">
             <Image
-              src="/company_logo.png"
+              src="/company_lo.png"
               alt="Lifestyle"
               width={28}
               height={28}
@@ -185,7 +185,7 @@ export function Sidebar({ user }: { user: SessionUser }) {
         <div className="flex items-center gap-2.5">
           <div className="w-7 h-7 rounded-md overflow-hidden bg-white flex items-center justify-center shrink-0">
             <Image
-              src="/company_logo.png"
+              src="/company_lo.png"
               alt="Lifestyle"
               width={24}
               height={24}
