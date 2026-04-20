@@ -492,7 +492,10 @@ function KPICard({
         <p className="text-[11px] text-[#7d8590] leading-snug">{label}</p>
         <span className="shrink-0">{icon}</span>
       </div>
-      <p className="text-xl sm:text-2xl font-semibold text-[#e6edf3] leading-tight break-words">
+      <p
+        className="text-base sm:text-xl font-semibold text-[#e6edf3] leading-tight truncate"
+        title={value}
+      >
         {value}
       </p>
       <p className="text-[11px] text-[#484f58] mt-1.5 leading-snug">{sub}</p>
