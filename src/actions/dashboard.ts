@@ -74,8 +74,8 @@ export async function getDashboardData() {
 
     // ── Ledger summary — total scheduled, paid, outstanding ───────────────
     prisma.ledgerEntry.aggregate({
-      _sum: { amount: true },
-    }).then(async (total) => {
+  _sum: { amount: true },
+}).then(async (total: { _sum: { amount: unknown } }) => {
       const paid = await prisma.ledgerEntry.aggregate({
         where: { status: "PAID" },
         _sum:  { amount: true },
