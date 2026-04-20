@@ -116,30 +116,38 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
-/* ✅ Single @layer base — duplicate removed, safe area insets added */
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
   body {
     @apply bg-background text-foreground;
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
+  }
+}
+
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
   }
 }
 
 /* --- BUSTANI PRINT ENGINE --- */
 @media print {
+  /* Hide the sidebar, header, and profile details */
   body * {
     visibility: hidden;
   }
-
+  
+  /* Show only the specific offer letter container */
   .print-only, .print-only * {
     visibility: visible;
   }
-
+  
+  /* Reset positioning so it fills the paper */
   .print-only {
     position: absolute;
     left: 0;
@@ -149,6 +157,7 @@
     padding: 0;
   }
 
+  /* Force background colors to show in print */
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
