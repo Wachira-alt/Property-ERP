@@ -45,7 +45,7 @@ export async function createContact(formData: FormData) {
   })
 
   if (!parsed.success) {
-    return { error: parsed.error.errors[0].message }
+    return { error: parsed.error.issues[0].message }
   }
 
   // If a unit was selected, verify it is still available
@@ -95,7 +95,7 @@ export async function assignUnit(formData: FormData) {
   })
 
   if (!parsed.success) {
-    return { error: parsed.error.errors[0].message }
+    return { error: parsed.error.issues[0].message }
   }
 
   const { contactId, unitId } = parsed.data
@@ -138,7 +138,7 @@ export async function addNote(formData: FormData) {
   })
 
   if (!parsed.success) {
-    return { error: parsed.error.errors[0].message }
+    return { error: parsed.error.issues[0].message }
   }
 
   try {

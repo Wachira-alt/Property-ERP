@@ -41,7 +41,7 @@ export async function createUser(formData: FormData) {
   })
 
   if (!parsed.success) {
-    return { error: parsed.error.errors[0].message }
+    return { error: parsed.error.issues[0].message }
   }
 
   const { name, email, password, role } = parsed.data
@@ -76,7 +76,7 @@ export async function updateUser(formData: FormData) {
   })
 
   if (!parsed.success) {
-    return { error: parsed.error.errors[0].message }
+    return { error: parsed.error.issues[0].message }
   }
 
   const { userId, name, role } = parsed.data
@@ -153,7 +153,7 @@ export async function resetPassword(formData: FormData) {
   })
 
   if (!parsed.success) {
-    return { error: parsed.error.errors[0].message }
+    return { error: parsed.error.issues[0].message }
   }
 
   const { userId, password } = parsed.data

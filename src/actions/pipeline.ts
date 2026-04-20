@@ -33,7 +33,7 @@ export async function moveToReservation(formData: FormData) {
   })
 
   if (!parsed.success) {
-    return { error: parsed.error.errors[0].message }
+    return { error: parsed.error.issues[0].message }
   }
 
   const { contactId, agreedPrice, paymentMethod } = parsed.data
@@ -193,7 +193,7 @@ export async function extendReservation(formData: FormData) {
   })
 
   if (!parsed.success) {
-    return { error: parsed.error.errors[0].message }
+    return { error: parsed.error.issues[0].message }
   }
 
   const { unitId, days, reason } = parsed.data
