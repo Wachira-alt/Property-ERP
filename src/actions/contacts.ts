@@ -191,6 +191,13 @@ export async function getContacts(search?: string, stage?: string) {
 }
 
 export async function getContactById(id: string) {
+  const { checkAndExpireReservation } = await import("@/lib/expiry")
+  const opp = await prisma.opportunity.findUnique({
+    where:  { contactId: id },
+    select: { unitId: true },
+  })
+  if (opp?.unitId) await checkAndExpireReservation(opp.unitId)
+
   return prisma.contact.findUnique({
     where: { id, deletedAt: null },
     include: {
