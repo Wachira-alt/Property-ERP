@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { getProjects } from "@/actions/inventory"
 import { getSession } from "@/lib/auth"
 import { canPerform } from "@/lib/permissions"

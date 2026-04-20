@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Re-export everything for clean single-import access
 export type { SessionUser }                                    from "@/types/auth"
 

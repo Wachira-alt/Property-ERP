@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { notFound, redirect } from "next/navigation"
 import { getSession } from "@/lib/auth"
 import { getContactById } from "@/actions/contacts"

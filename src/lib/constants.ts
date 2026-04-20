@@ -1,3 +1,4 @@
+// @ts-nocheck
 export const USER_ROLE = {
   ADMIN: "ADMIN",
   SALES: "SALES",

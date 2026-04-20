@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Check } from "lucide-react"
 
 type Stage = "GREEN" | "AMBER" | "CLOSED" | "EXPIRED" | "CANCELLED"

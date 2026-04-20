@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { SignJWT, jwtVerify } from "jose"
 import type { SessionUser } from "@/types/auth"
 

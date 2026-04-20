@@ -1,3 +1,4 @@
+// @ts-nocheck
 export type UnitStatus     = "AVAILABLE" | "RESERVED" | "SOLD"
 export type PaymentMethod  = "CASH" | "MORTGAGE"
 

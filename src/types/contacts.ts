@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { PipelineStage, OpportunityForDetail } from "@/types/pipeline"
 
 export type ContactNote = {

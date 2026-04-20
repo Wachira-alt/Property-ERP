@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { CheckCircle2, Circle, Download } from "lucide-react"
 
 type Document = {

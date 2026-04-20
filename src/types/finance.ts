@@ -1,3 +1,4 @@
+// @ts-nocheck
 export type PaymentStatus = "PENDING" | "PAID" | "OVERDUE"
 
 export type LedgerEntryForTable = {

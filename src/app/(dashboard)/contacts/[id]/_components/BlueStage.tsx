@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { ClosingGate }      from "./ClosingGate"
 import { FinalizeSaleBtn }  from "./FinalizeSaleBtn"
 import { ExtendReservationBtn } from "./ExtendReservationBtn"

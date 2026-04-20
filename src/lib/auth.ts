@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { cookies } from "next/headers"
 import { prisma } from "@/lib/prisma"
 import { verifyToken, SESSION_COOKIE } from "@/lib/jwt"

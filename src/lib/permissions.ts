@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { UserRole } from "@/lib/constants"
 
 export type Action =

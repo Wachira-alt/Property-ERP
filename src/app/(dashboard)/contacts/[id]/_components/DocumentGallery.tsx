@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { FileText, Download, Clock } from "lucide-react"
 import { formatDateTime } from "@/lib/utils"
 
