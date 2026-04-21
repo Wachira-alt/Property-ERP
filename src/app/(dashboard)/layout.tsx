@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import { getSession } from "@/lib/auth"
 import { SessionProvider } from "@/components/shared/SessionProvider"
 import { Sidebar } from "@/components/shared/Sidebar"
+import { AutoRefresh } from "./AutoRefresh"
 
 export default async function DashboardLayout({
   children,
@@ -17,6 +18,7 @@ export default async function DashboardLayout({
 
   return (
     <SessionProvider user={user}>
+      <AutoRefresh />
       <div className="min-h-screen bg-[#0d1117] text-[#e6edf3]">
         <Sidebar user={user} />
         <main className="md:pl-[240px] min-h-screen">
