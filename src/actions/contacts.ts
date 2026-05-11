@@ -208,6 +208,7 @@ export async function getContactById(id: string) {
         include: { author: { select: { id: true, name: true } } },
         orderBy: { createdAt: "desc" },
       },
+      
       opportunity: {
         include: {
           unit: {
