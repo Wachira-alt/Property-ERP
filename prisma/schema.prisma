@@ -3,10 +3,209 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  }
+  provider = "postgresql"
+}
 
-// ─── Enums ────────────────────────────────────────────────────────────────────
+model User {
+  id               String                 @id @default(cuid())
+  name             String
+  email            String                 @unique
+  password         String
+  role             UserRole
+  isActive         Boolean                @default(true)
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  deletedAt        DateTime?
+  assignedContacts Contact[]              @relation("AgentContacts")
+  markedPayments   LedgerEntry[]          @relation("MarkedByAccountant")
+  notes            Note[]
+  extensions       ReservationExtension[]
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+model Project {
+  id          String     @id @default(cuid())
+  name        String
+  location    String?
+  description String?
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  contacts    Contact[]
+  unitTypes   UnitType[]
+
+  @@map("projects")
+}
+
+model UnitType {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  projectId   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  project     Project  @relation(fields: [projectId], references: [id])
+  units       Unit[]
+
+  @@index([projectId])
+  @@map("unit_types")
+}
+
+model Unit {
+  id            String                 @id @default(cuid())
+  name          String
+  floor         String?
+  status        UnitStatus             @default(AVAILABLE)
+  reservedUntil DateTime?
+  unitTypeId    String
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  opportunity   Opportunity?
+  extensions    ReservationExtension[]
+  unitType      UnitType               @relation(fields: [unitTypeId], references: [id])
+
+  @@index([unitTypeId])
+  @@index([status])
+  @@map("units")
+}
+
+model Contact {
+  id          String       @id @default(cuid())
+  firstName   String
+  lastName    String
+  email       String?
+  phone       String
+  projectId   String
+  agentId     String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  deletedAt   DateTime?
+  agent       User         @relation("AgentContacts", fields: [agentId], references: [id])
+  project     Project      @relation(fields: [projectId], references: [id])
+  notes       Note[]
+  opportunity Opportunity?
+
+  @@index([projectId])
+  @@index([agentId])
+  @@map("contacts")
+}
+
+model Opportunity {
+  id            String         @id @default(cuid())
+  contactId     String         @unique
+  unitId        String?        @unique
+  stage         PipelineStage  @default(GREEN)
+  agreedPrice   Decimal?       @db.Decimal(12, 2)
+  paymentMethod PaymentMethod?
+  closedAt      DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  documents     Document[]
+  ledgerEntries LedgerEntry[]
+  contact       Contact        @relation(fields: [contactId], references: [id])
+  unit          Unit?          @relation(fields: [unitId], references: [id])
+
+  @@index([stage])
+  @@index([unitId])
+  @@map("opportunities")
+}
+
+model LedgerEntry {
+  id             String        @id @default(cuid())
+  opportunityId  String
+  description    String
+  amount         Decimal       @db.Decimal(12, 2)
+  dueDate        DateTime
+  status         PaymentStatus @default(PENDING)
+  paidAt         DateTime?
+  paymentRef     String?
+  markedById     String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  receiptFileKey String?
+  receiptUrl     String?
+  markedBy       User?         @relation("MarkedByAccountant", fields: [markedById], references: [id])
+  opportunity    Opportunity   @relation(fields: [opportunityId], references: [id])
+
+  @@index([opportunityId])
+  @@index([dueDate])
+  @@index([status])
+  @@map("ledger_entries")
+}
+
+model Document {
+  id            String       @id @default(cuid())
+  opportunityId String
+  type          DocumentType
+  fileName      String
+  fileUrl       String
+  fileKey       String
+  uploadedAt    DateTime     @default(now())
+  opportunity   Opportunity  @relation(fields: [opportunityId], references: [id])
+
+  @@index([opportunityId])
+  @@index([type])
+  @@map("documents")
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  contactId String
+  authorId  String
+  content   String
+  createdAt DateTime @default(now())
+  author    User     @relation(fields: [authorId], references: [id])
+  contact   Contact  @relation(fields: [contactId], references: [id])
+
+  @@index([contactId])
+  @@map("notes")
+}
+
+model ReservationExtension {
+  id             String   @id @default(cuid())
+  unitId         String
+  grantedById    String
+  previousExpiry DateTime
+  newExpiry      DateTime
+  reason         String?
+  createdAt      DateTime @default(now())
+  grantedBy      User     @relation(fields: [grantedById], references: [id])
+  unit           Unit     @relation(fields: [unitId], references: [id])
+
+  @@index([unitId])
+  @@map("reservation_extensions")
+}
+
+model Campaign {
+  id          String               @id @default(cuid())
+  subject     String
+  body        String
+  sentAt      DateTime?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  audience    String               @default("ALL")
+  sentCount   Int                  @default(0)
+  attachments CampaignAttachment[]
+
+  @@map("campaigns")
+}
+
+model CampaignAttachment {
+  id         String   @id @default(cuid())
+  campaignId String
+  fileName   String
+  fileUrl    String
+  fileKey    String
+  mimeType   String
+  createdAt  DateTime @default(now())
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@map("campaign_attachments")
+}
 
 enum UserRole {
   ADMIN
@@ -26,9 +225,9 @@ enum PipelineStage {
   GREEN
   AMBER
   CLOSED
-  PAST
   EXPIRED
   CANCELLED
+  PAST
 }
 
 enum PaymentMethod {
@@ -48,230 +247,4 @@ enum DocumentType {
   OFFER_LETTER_UNSIGNED
   OFFER_LETTER_SIGNED
   BOOKING_RECEIPT
-}
-
-// ─── Team ─────────────────────────────────────────────────────────────────────
-
-model User {
-  id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  password  String
-  role      UserRole
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  deletedAt DateTime?
-
-  // Relations
-  assignedContacts  Contact[]             @relation("AgentContacts")
-  notes             Note[]
-  extensions        ReservationExtension[]
-  markedPayments    LedgerEntry[]         @relation("MarkedByAccountant")
-
-  @@index([email])
-  @@index([role])
-  @@map("users")
-}
-
-// ─── Inventory ────────────────────────────────────────────────────────────────
-
-model Project {
-  id          String   @id @default(cuid())
-  name        String
-  location    String?
-  description String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  unitTypes   UnitType[]
-  contacts    Contact[]
-
-  @@map("projects")
-}
-
-model UnitType {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  projectId   String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  project     Project  @relation(fields: [projectId], references: [id])
-  units       Unit[]
-
-  @@index([projectId])
-  @@map("unit_types")
-}
-
-model Unit {
-  id           String     @id @default(cuid())
-  name         String
-  floor        String?
-  status       UnitStatus @default(AVAILABLE)
-  reservedUntil DateTime?
-  unitTypeId   String
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-
-  unitType      UnitType              @relation(fields: [unitTypeId], references: [id])
-  opportunity   Opportunity?
-  extensions    ReservationExtension[]
-
-  @@index([unitTypeId])
-  @@index([status])
-  @@map("units")
-}
-
-// ─── Pipeline ─────────────────────────────────────────────────────────────────
-
-model Contact {
-  id        String   @id @default(cuid())
-  firstName String
-  lastName  String
-  email     String?
-  phone     String
-  projectId String
-  agentId   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  deletedAt DateTime?
-
-  project     Project      @relation(fields: [projectId], references: [id])
-  agent       User         @relation("AgentContacts", fields: [agentId], references: [id])
-  opportunity Opportunity?
-  notes       Note[]
-
-  @@index([projectId])
-  @@index([agentId])
-  @@map("contacts")
-}
-
-model Opportunity {
-  id            String        @id @default(cuid())
-  contactId     String        @unique
-  unitId        String?       @unique   // ← add the ?
-  stage         PipelineStage @default(GREEN)
-  agreedPrice   Decimal?      @db.Decimal(12, 2)
-  paymentMethod PaymentMethod?
-  closedAt      DateTime?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-
-  contact       Contact       @relation(fields: [contactId], references: [id])
-  unit          Unit?         @relation(fields: [unitId], references: [id])  // ← add the ?
-  ledgerEntries LedgerEntry[]
-  documents     Document[]
-
-  @@index([stage])
-  @@index([unitId])
-  @@map("opportunities")
-}
-
-// ─── Finance ──────────────────────────────────────────────────────────────────
-
-model LedgerEntry {
-  id            String        @id @default(cuid())
-  opportunityId String
-  description   String
-  amount        Decimal       @db.Decimal(12, 2)
-  dueDate       DateTime
-  status        PaymentStatus @default(PENDING)
-  paidAt        DateTime?
-  paymentRef    String?
-  markedById    String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-
-  opportunity   Opportunity   @relation(fields: [opportunityId], references: [id])
-  markedBy      User?         @relation("MarkedByAccountant", fields: [markedById], references: [id])
-
-  @@index([opportunityId])
-  @@index([dueDate])
-  @@index([status])
-  @@map("ledger_entries")
-}
-
-// ─── Documents ────────────────────────────────────────────────────────────────
-
-model Document {
-  id            String       @id @default(cuid())
-  opportunityId String
-  type          DocumentType
-  fileName      String
-  fileUrl       String
-  fileKey       String
-  uploadedAt    DateTime     @default(now())
-
-  opportunity   Opportunity  @relation(fields: [opportunityId], references: [id])
-
-  @@index([opportunityId])
-  @@index([type])
-  @@map("documents")
-}
-
-// ─── Audit Logs ───────────────────────────────────────────────────────────────
-
-model Note {
-  id        String   @id @default(cuid())
-  contactId String
-  authorId  String
-  content   String
-  createdAt DateTime @default(now())
-
-  contact   Contact  @relation(fields: [contactId], references: [id])
-  author    User     @relation(fields: [authorId], references: [id])
-
-  @@index([contactId])
-  @@map("notes")
-}
-
-model ReservationExtension {
-  id          String   @id @default(cuid())
-  unitId      String
-  grantedById String
-  previousExpiry DateTime
-  newExpiry      DateTime
-  reason      String?
-  createdAt   DateTime @default(now())
-
-  unit        Unit     @relation(fields: [unitId], references: [id])
-  grantedBy   User     @relation(fields: [grantedById], references: [id])
-
-  @@index([unitId])
-  @@map("reservation_extensions")
-}
-
-// ─── Marketing ────────────────────────────────────────────────────────────────
-
-model Campaign {
-  id        String   @id @default(cuid())
-  subject   String
-  body      String   @db.Text
-  audience  String   @default("ALL")
-  sentAt    DateTime?
-  sentCount Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  attachments CampaignAttachment[]
-
-  @@map("campaigns")
-}
-
-model CampaignAttachment {
-  id         String   @id @default(cuid())
-  campaignId String
-  fileName   String
-  fileUrl    String
-  fileKey    String
-  mimeType   String
-  createdAt  DateTime @default(now())
-
-  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-
-  @@index([campaignId])
-  @@map("campaign_attachments")
 }

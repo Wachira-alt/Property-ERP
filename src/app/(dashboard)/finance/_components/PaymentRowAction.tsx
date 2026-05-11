@@ -1,7 +1,7 @@
 // @ts-nocheck
 "use client"
 
-import { useState, useTransition } from "react"
+import { useState, useTransition, useRef } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,7 +13,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { markAsPaid } from "@/actions/finance"
-import { CheckCircle2 } from "lucide-react"
+import { CheckCircle2, Upload, FileCheck, Loader2, X } from "lucide-react"
 import { formatCurrency, formatDate } from "@/lib/utils"
 
 type Props = {
@@ -29,9 +29,50 @@ export function PaymentRowAction({
   amount,
   dueDate,
 }: Props) {
-  const [open, setOpen]              = useState(false)
-  const [ref, setRef]                = useState("")
-  const [isPending, startTransition] = useTransition()
+  const [open, setOpen]               = useState(false)
+  const [ref, setRef]                 = useState("")
+  const [isPending, startTransition]  = useTransition()
+  const [uploading, setUploading]     = useState(false)
+  const [receiptUrl, setReceiptUrl]   = useState("")
+  const [receiptKey, setReceiptKey]   = useState("")
+  const [receiptName, setReceiptName] = useState("")
+  const fileInputRef                  = useRef<HTMLInputElement>(null)
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploading(true)
+    try {
+      const fd = new FormData()
+      fd.append("file",    file)
+      fd.append("docType", "payment_receipt")
+
+      const res  = await fetch("/api/upload", { method: "POST", body: fd })
+      const data = await res.json()
+
+      if (!res.ok) {
+        toast.error(data.error ?? "Upload failed")
+        return
+      }
+
+      setReceiptUrl(data.viewUrl)
+      setReceiptKey(data.fileId)
+      setReceiptName(file.name)
+      toast.success("Receipt uploaded")
+    } catch {
+      toast.error("Upload failed. Please try again.")
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  function clearReceipt() {
+    setReceiptUrl("")
+    setReceiptKey("")
+    setReceiptName("")
+    if (fileInputRef.current) fileInputRef.current.value = ""
+  }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -43,6 +84,8 @@ export function PaymentRowAction({
     const fd = new FormData()
     fd.set("entryId",    entryId)
     fd.set("paymentRef", ref.trim())
+    if (receiptUrl)  fd.set("receiptUrl",     receiptUrl)
+    if (receiptKey)  fd.set("receiptFileKey", receiptKey)
 
     startTransition(async () => {
       const result = await markAsPaid(fd)
@@ -50,9 +93,10 @@ export function PaymentRowAction({
       if (result?.error) {
         toast.error(result.error)
       } else {
-        toast.success("Payment marked as paid")
+        toast.success("Payment recorded successfully")
         setOpen(false)
         setRef("")
+        clearReceipt()
       }
     })
   }
@@ -74,7 +118,7 @@ export function PaymentRowAction({
         <DialogHeader>
           <DialogTitle className="text-[#e6edf3]">Record Payment</DialogTitle>
           <p className="text-sm text-[#7d8590]">
-            Enter the M-Pesa or bank reference code for this payment.
+            Enter the payment reference and optionally upload a receipt.
           </p>
         </DialogHeader>
 
@@ -97,6 +141,7 @@ export function PaymentRowAction({
             </div>
           </div>
 
+          {/* Payment reference */}
           <div className="space-y-1.5">
             <label className="text-xs text-[#e6edf3] font-medium">
               Payment reference <span className="text-[#f85149]">*</span>
@@ -113,6 +158,62 @@ export function PaymentRowAction({
             </p>
           </div>
 
+          {/* Receipt upload */}
+          <div className="space-y-1.5">
+            <label className="text-xs text-[#e6edf3] font-medium">
+              Payment receipt
+              <span className="ml-1.5 text-[#484f58] font-normal">optional</span>
+            </label>
+
+            {receiptName ? (
+              <div className="flex items-center justify-between gap-2 px-3 py-2.5 bg-[#1a4f2a1a] border border-[#2ea04333] rounded-lg">
+                <div className="flex items-center gap-2 min-w-0">
+                  <FileCheck size={14} className="text-[#3fb950] shrink-0" />
+                  <span className="text-xs text-[#3fb950] truncate">
+                    {receiptName}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={clearReceipt}
+                  className="text-[#484f58] hover:text-[#f85149] shrink-0"
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            ) : (
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center justify-center gap-2 px-3 py-3 border border-dashed border-[#30363d] rounded-lg cursor-pointer hover:border-[#484f58] hover:bg-[#21262d] transition-colors"
+              >
+                {uploading ? (
+                  <>
+                    <Loader2 size={14} className="text-[#7d8590] animate-spin" />
+                    <span className="text-xs text-[#7d8590]">Uploading…</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload size={14} className="text-[#484f58]" />
+                    <span className="text-xs text-[#7d8590]">
+                      Click to upload receipt
+                    </span>
+                    <span className="text-[10px] text-[#484f58]">
+                      PDF, JPG, PNG — max 8MB
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+          </div>
+
           <div className="flex justify-end gap-2 pt-1">
             <Button
               type="button"
@@ -124,7 +225,7 @@ export function PaymentRowAction({
             </Button>
             <Button
               type="submit"
-              disabled={isPending || !ref.trim()}
+              disabled={isPending || uploading || !ref.trim()}
               className="bg-[#238636] hover:bg-[#2ea043] text-white border-0"
             >
               {isPending ? "Recording…" : "Confirm payment"}

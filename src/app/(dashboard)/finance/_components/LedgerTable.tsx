@@ -6,26 +6,28 @@ import { PaymentRowAction } from "./PaymentRowAction"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { canPerform } from "@/lib/permissions"
 import type { SessionUser } from "@/types/auth"
-import { AlertCircle, ChevronRight, ChevronDown, FileText } from "lucide-react"
+import { AlertCircle, ChevronRight, ChevronDown, FileCheck } from "lucide-react"
 import { DownloadBtn } from "@/components/shared/DownloadBtn"
 
 type LedgerEntry = {
-  id:          string
-  description: string
-  amount:      number
-  dueDate:     Date
-  status:      string
-  paidAt:      Date | null
-  paymentRef:  string | null
+  id:             string
+  description:    string
+  amount:         number
+  dueDate:        Date
+  status:         string
+  paidAt:         Date | null
+  paymentRef:     string | null
+  receiptUrl:     string | null
+  receiptFileKey: string | null
 }
 
 type OpportunityGroup = {
   opportunityId: string
-  contact: { id: string; firstName: string; lastName: string }
-  unit: { name: string } | null
-  totalAmount: number
-  totalPaid:   number
-  entries:     LedgerEntry[]
+  contact:       { id: string; firstName: string; lastName: string }
+  unit:          { name: string } | null
+  totalAmount:   number
+  totalPaid:     number
+  entries:       LedgerEntry[]
 }
 
 type Props = { groups: OpportunityGroup[]; session: SessionUser }
@@ -40,7 +42,7 @@ export function LedgerTable({ groups, session }: Props) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const canMarkPaid = canPerform(session.role, "MARK_PAYMENT_PAID")
 
-  const toggleExpand = (id: string) => {
+  function toggleExpand(id: string) {
     const next = new Set(expandedIds)
     if (next.has(id)) next.delete(id)
     else next.add(id)
@@ -70,24 +72,26 @@ export function LedgerTable({ groups, session }: Props) {
 
       <div className="divide-y divide-[#21262d]">
         {groups.map((group) => {
-          const isExpanded = expandedIds.has(group.opportunityId)
-          const hasOverdue = group.entries.some(e => e.status === "PENDING" && new Date(e.dueDate) < new Date())
+          const isExpanded  = expandedIds.has(group.opportunityId)
+          const hasOverdue  = group.entries.some(
+            (e) => e.status === "PENDING" && new Date(e.dueDate) < new Date()
+          )
           const isFullyPaid = group.totalPaid >= group.totalAmount
           const contactName = `${group.contact.firstName} ${group.contact.lastName}`
 
           return (
             <div key={group.opportunityId} className="flex flex-col">
               {/* Group Summary Row */}
-              <div 
-                className="flex flex-col md:grid md:grid-cols-[1fr_130px_120px_100px_120px_110px] gap-2 md:gap-4 px-4 py-3.5 bg-[#0d1117] hover:bg-[#161b22] transition-colors group relative"
-              >
-                {/* Mobile/Tablet Clickable area for expansion */}
-                <div 
+              <div className="flex flex-col md:grid md:grid-cols-[1fr_130px_120px_100px_120px_110px] gap-2 md:gap-4 px-4 py-3.5 bg-[#0d1117] hover:bg-[#161b22] transition-colors group relative">
+                <div
                   onClick={() => toggleExpand(group.opportunityId)}
                   className="flex items-center gap-3 min-w-0 cursor-pointer"
                 >
                   <div className="text-[#484f58] group-hover:text-[#e6edf3]">
-                    {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                    {isExpanded
+                      ? <ChevronDown size={14} />
+                      : <ChevronRight size={14} />
+                    }
                   </div>
                   <div className="flex flex-col min-w-0">
                     <span className="text-xs font-semibold text-[#58a6ff] truncate">
@@ -99,7 +103,6 @@ export function LedgerTable({ groups, session }: Props) {
                   </div>
                 </div>
 
-                {/* Desktop Columns */}
                 <div className="hidden md:flex items-center text-xs text-[#7d8590]">
                   {group.unit?.name ?? "—"}
                 </div>
@@ -110,14 +113,17 @@ export function LedgerTable({ groups, session }: Props) {
                   {group.entries.length} items
                 </div>
                 <div className="hidden md:flex items-center">
-                   <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${
-                     hasOverdue ? STATUS_STYLES.OVERDUE : isFullyPaid ? STATUS_STYLES.PAID : STATUS_STYLES.PENDING
-                   }`}>
-                     {hasOverdue ? "OVERDUE" : isFullyPaid ? "FULLY PAID" : "PARTIAL"}
-                   </span>
+                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${
+                    hasOverdue
+                      ? STATUS_STYLES.OVERDUE
+                      : isFullyPaid
+                      ? STATUS_STYLES.PAID
+                      : STATUS_STYLES.PENDING
+                  }`}>
+                    {hasOverdue ? "OVERDUE" : isFullyPaid ? "FULLY PAID" : "PARTIAL"}
+                  </span>
                 </div>
 
-                {/* Actions Column (Download Statement) */}
                 <div className="flex items-center gap-2 md:static absolute right-4 top-3.5">
                   <DownloadBtn
                     url={`/api/documents/statement?contactId=${group.contact.id}`}
@@ -137,29 +143,69 @@ export function LedgerTable({ groups, session }: Props) {
                     const status    = (isOverdue ? "OVERDUE" : entry.status) as keyof typeof STATUS_STYLES
 
                     return (
-                      <div key={entry.id} className="flex flex-col md:grid md:grid-cols-[1fr_130px_120px_100px_120px_110px] gap-2 md:gap-4 px-4 py-3.5 pl-10">
-                        <div className="text-xs text-[#e6edf3] truncate">{entry.description}</div>
+                      <div
+                        key={entry.id}
+                        className="flex flex-col md:grid md:grid-cols-[1fr_130px_120px_100px_120px_110px] gap-2 md:gap-4 px-4 py-3.5 pl-10"
+                      >
+                        {/* Description */}
+                        <div className="text-xs text-[#e6edf3] truncate">
+                          {entry.description}
+                        </div>
+
+                        {/* Empty unit col */}
                         <div className="hidden md:block" />
+
+                        {/* Amount */}
                         <div className="text-xs font-semibold text-[#e6edf3] md:flex md:items-center">
                           {formatCurrency(entry.amount)}
                         </div>
+
+                        {/* Due date */}
                         <div className="text-xs text-[#7d8590] md:flex md:items-center">
                           {formatDate(entry.dueDate)}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${STATUS_STYLES[status]}`}>
-                            {status}
-                          </span>
+
+                        {/* Status + receipt links */}
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${STATUS_STYLES[status]}`}>
+                              {status}
+                            </span>
+                          </div>
+
                           {entry.status === "PAID" && (
-                            <DownloadBtn
-                              url={`/api/documents/receipt?entryId=${entry.id}`}
-                              fileName={`receipt-${entry.id.slice(-6)}.pdf`}
-                              label=""
-                              variant="ghost"
-                              className="h-6 w-6 p-0"
-                            />
+                            <div className="flex flex-col gap-0.5">
+                              {/* Generated PDF receipt */}
+                              <DownloadBtn
+                                url={`/api/documents/receipt?entryId=${entry.id}`}
+                                fileName={`receipt-${entry.id.slice(-6)}.pdf`}
+                                label="PDF receipt"
+                                variant="ghost"
+                                className="h-auto py-0.5 px-1 text-[10px] justify-start"
+                              />
+                              {/* Uploaded payment proof */}
+                              {entry.receiptUrl && (
+                                <a
+                                  href={entry.receiptUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-[10px] text-[#3fb950] hover:underline px-1"
+                                >
+                                  <FileCheck size={10} />
+                                  Payment proof
+                                </a>
+                              )}
+                              {/* Payment ref */}
+                              {entry.paymentRef && (
+                                <span className="text-[10px] text-[#484f58] font-mono px-1">
+                                  {entry.paymentRef}
+                                </span>
+                              )}
+                            </div>
                           )}
                         </div>
+
+                        {/* Mark paid action */}
                         <div className="flex items-center">
                           {canMarkPaid && (entry.status === "PENDING" || isOverdue) && (
                             <PaymentRowAction

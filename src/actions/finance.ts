@@ -15,8 +15,10 @@ const createLedgerEntrySchema = z.object({
 })
 
 const markAsPaidSchema = z.object({
-  entryId:    z.string().min(1),
-  paymentRef: z.string().min(1, "Payment reference is required"),
+  entryId:        z.string().min(1),
+  paymentRef:     z.string().min(1, "Payment reference is required"),
+  receiptUrl:     z.string().optional(),
+  receiptFileKey: z.string().optional(),
 })
 
 // ─── Create Ledger Entry ──────────────────────────────────────────────────────
@@ -100,15 +102,17 @@ export async function markAsPaid(formData: FormData) {
   assertPermission(session.role, "MARK_PAYMENT_PAID")
 
   const parsed = markAsPaidSchema.safeParse({
-    entryId:    formData.get("entryId"),
-    paymentRef: formData.get("paymentRef"),
+    entryId:        formData.get("entryId"),
+    paymentRef:     formData.get("paymentRef"),
+    receiptUrl:     formData.get("receiptUrl")     || undefined,
+    receiptFileKey: formData.get("receiptFileKey") || undefined,
   })
 
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message }
   }
 
-  const { entryId, paymentRef } = parsed.data
+  const { entryId, paymentRef, receiptUrl, receiptFileKey } = parsed.data
 
   // ── Step 1: Load entry and validate ───────────────────────────────────────
   const entry = await prisma.ledgerEntry.findUnique({
@@ -123,10 +127,12 @@ export async function markAsPaid(formData: FormData) {
     await prisma.ledgerEntry.update({
       where: { id: entryId },
       data: {
-        status:     "PAID",
-        paidAt:     new Date(),
+        status:         "PAID",
+        paidAt:         new Date(),
         paymentRef,
-        markedById: session.id,
+        receiptUrl:     receiptUrl     ?? null,
+        receiptFileKey: receiptFileKey ?? null,
+        markedById:     session.id,
       },
     })
   } catch {
@@ -136,11 +142,11 @@ export async function markAsPaid(formData: FormData) {
   // ── Step 3: Auto-Transition Logic ─────────────────────────────────────────
   try {
     const opportunity = await prisma.opportunity.findUnique({
-      where: { id: entry.opportunityId },
-      include: { 
-        documents: true, 
+      where:   { id: entry.opportunityId },
+      include: {
+        documents:     true,
         ledgerEntries: true,
-        unit: true 
+        unit:          true,
       },
     })
 
@@ -149,43 +155,41 @@ export async function markAsPaid(formData: FormData) {
       return { success: true }
     }
 
-    // 1. Check if "Closing Gate" conditions are met (Auto-Move to CLOSED)
-    const docTypes = opportunity.documents.map((d) => d.type)
+    const docTypes     = opportunity.documents.map((d) => d.type)
     const requiredDocs = ["NATIONAL_ID", "KRA_PIN", "OFFER_LETTER_SIGNED", "BOOKING_RECEIPT"]
-    const hasAllDocs = requiredDocs.every((type) => docTypes.includes(type as any))
-    
-    const ledgerTotal = opportunity.ledgerEntries.reduce((sum, e) => sum + Number(e.amount), 0)
-    const isPriceMet = ledgerTotal >= Number(opportunity.agreedPrice)
+    const hasAllDocs   = requiredDocs.every((type) => docTypes.includes(type as any))
 
-    let currentStage = opportunity.stage
+    const ledgerTotal = opportunity.ledgerEntries.reduce(
+      (sum, e) => sum + Number(e.amount), 0
+    )
+    const isPriceMet  = ledgerTotal >= Number(opportunity.agreedPrice)
 
-    // AUTO-HARD-LOCK: Move from AMBER to CLOSED if docs and price alignment are ready
+    let currentStage  = opportunity.stage
+
     if (currentStage === "AMBER" && hasAllDocs && isPriceMet) {
       await prisma.$transaction([
         prisma.opportunity.update({
           where: { id: opportunity.id },
-          data: { stage: "CLOSED", closedAt: new Date() },
+          data:  { stage: "CLOSED", closedAt: new Date() },
         }),
         prisma.unit.update({
           where: { id: opportunity.unitId! },
-          data: { status: "SOLD", reservedUntil: null },
+          data:  { status: "SOLD", reservedUntil: null },
         }),
       ])
       currentStage = "CLOSED"
-      console.log("[Auto-Transition] Moved to CLOSED:", opportunity.id)
     }
 
-    // 2. Check if "PAST" conditions are met (All money paid)
-    const allPaid = opportunity.ledgerEntries.every((e) => e.status === "PAID")
+    const allPaid = opportunity.ledgerEntries.every((e) =>
+      e.id === entryId ? true : e.status === "PAID"
+    )
 
     if (allPaid && (currentStage === "CLOSED" || currentStage === "AMBER")) {
       await prisma.opportunity.update({
         where: { id: opportunity.id },
-        data: { stage: "PAST" },
+        data:  { stage: "PAST" },
       })
-      console.log("[Auto-Transition] Moved to PAST:", opportunity.id)
     }
-
   } catch (err) {
     console.error("[markAsPaid] Auto-transition failed:", err)
   }
