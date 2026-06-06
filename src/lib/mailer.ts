@@ -37,7 +37,7 @@ export async function sendEmail({
   const mail = getTransporter()
 
   await mail.sendMail({
-    from:        `"Lifestyle Properties" <${process.env.GMAIL_USER}>`,
+    from:        `"Home Bridge Ltd." <${process.env.GMAIL_USER}>`,
     to,
     subject,
     html,

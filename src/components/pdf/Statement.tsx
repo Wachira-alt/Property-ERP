@@ -157,7 +157,7 @@ export function StatementPDF({
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.companyName}>Lifestyle Properties Ltd.</Text>
+            <Text style={styles.companyName}>Home Bridge Ltd.</Text>
             <Text style={styles.companyTagline}>Premium Real Estate · Nairobi, Kenya</Text>
           </View>
           <View style={{ alignItems: "flex-end" }}>
@@ -248,7 +248,7 @@ export function StatementPDF({
         </View>
 
         <Text style={styles.footer}>
-          This is a computer-generated statement. Lifestyle Properties Ltd. · P.O Box 00100, Nairobi, Kenya
+          This is a computer-generated statement. Home Bridge Ltd. · P.O Box 00100, Nairobi, Kenya
         </Text>
       </Page>
     </Document>

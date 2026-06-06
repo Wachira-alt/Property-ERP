@@ -6,7 +6,10 @@ import { z } from "zod"
 import { prisma } from "@/lib/prisma"
 import { requireAuth } from "@/lib/auth"
 import { assertPermission } from "@/lib/permissions"
+import { isCompanyEmail } from "@/lib/auth"
 import bcrypt from "bcryptjs"
+
+const COMPANY_DOMAIN = "lifestyleestates.co.ke"
 
 const createUserSchema = z.object({
   name:     z.string().min(2, "Name must be at least 2 characters"),
@@ -47,6 +50,13 @@ export async function createUser(formData: FormData) {
 
   const { name, email, password, role } = parsed.data
 
+  // ── Domain restriction ──────────────────────────────────────────────────
+  if (!isCompanyEmail(email)) {
+    return {
+      error: `Only @${COMPANY_DOMAIN} email addresses are allowed.`,
+    }
+  }
+
   try {
     const existing = await prisma.user.findUnique({ where: { email } })
     if (existing) {
@@ -83,14 +93,11 @@ export async function updateUser(formData: FormData) {
   const { userId, name, role } = parsed.data
 
   try {
-    // Prevent demoting the last admin
     if (role !== "ADMIN") {
       const adminCount = await prisma.user.count({
         where: { role: "ADMIN", isActive: true, deletedAt: null },
       })
-      const targetUser = await prisma.user.findUnique({
-        where: { id: userId },
-      })
+      const targetUser = await prisma.user.findUnique({ where: { id: userId } })
       if (adminCount === 1 && targetUser?.role === "ADMIN") {
         return { error: "Cannot change role — this is the last admin account." }
       }
@@ -113,10 +120,7 @@ export async function deactivateUser(userId: string) {
   assertPermission(session.role, "MANAGE_TEAM")
 
   try {
-    // Prevent deactivating the last admin
-    const targetUser = await prisma.user.findUnique({
-      where: { id: userId },
-    })
+    const targetUser = await prisma.user.findUnique({ where: { id: userId } })
 
     if (targetUser?.role === "ADMIN") {
       const adminCount = await prisma.user.count({
@@ -127,10 +131,14 @@ export async function deactivateUser(userId: string) {
       }
     }
 
-    // Prevent self-deactivation
     if (userId === session.id) {
       return { error: "You cannot deactivate your own account." }
     }
+
+    // Invalidate all sessions for this user
+    await import("@/lib/auth").then(({ invalidateAllUserSessions }) =>
+      invalidateAllUserSessions(userId)
+    )
 
     await prisma.user.update({
       where: { id: userId },
@@ -161,6 +169,12 @@ export async function resetPassword(formData: FormData) {
 
   try {
     const hashed = await bcrypt.hash(password, 12)
+
+    // Invalidate all existing sessions when password is reset
+    await import("@/lib/auth").then(({ invalidateAllUserSessions }) =>
+      invalidateAllUserSessions(userId)
+    )
+
     await prisma.user.update({
       where: { id: userId },
       data:  { password: hashed },

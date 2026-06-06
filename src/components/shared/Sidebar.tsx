@@ -105,7 +105,7 @@ function SidebarContent({ user, onNavigate }: { user: SessionUser; onNavigate?: 
           <div className="w-8 h-8 rounded-md overflow-hidden bg-white shrink-0 flex items-center justify-center">
             <Image
               src="/company_lo.png"
-              alt="Lifestyle"
+              alt="Home Bridge"
               width={28}
               height={28}
               className="object-contain"
@@ -113,7 +113,7 @@ function SidebarContent({ user, onNavigate }: { user: SessionUser; onNavigate?: 
           </div>
           <div className="min-w-0">
             <p className="text-sm font-semibold text-[#e6edf3] truncate leading-tight">
-              Lifestyle
+              Home Bridge
             </p>
             <p className="text-[11px] text-[#7d8590] truncate leading-tight capitalize">
               {user.role.toLowerCase().replace("_", " ")}
@@ -198,13 +198,13 @@ export function Sidebar({ user }: { user: SessionUser }) {
             <div className="w-7 h-7 rounded-md overflow-hidden bg-white flex items-center justify-center shrink-0">
               <Image
                 src="/company_lo.png"
-                alt="Lifestyle"
+                alt="Home Bridge"
                 width={24}
                 height={24}
                 className="object-contain"
               />
             </div>
-            <span className="text-sm font-semibold text-[#e6edf3]">Lifestyle</span>
+            <span className="text-sm font-semibold text-[#e6edf3]">Home Bridge</span>
           </div>
           <button
             onClick={() => setMobileOpen(true)}

@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
             <p>Dear ${contact.firstName},</p>
             <p>This is a reminder that your payment of <strong>KES ${Number(entry.amount).toLocaleString("en-KE")}</strong> for <strong>${entry.description}</strong> was due on <strong>${new Date(entry.dueDate).toLocaleDateString("en-KE")}</strong>.</p>
             <p>Please make payment as soon as possible and send your M-Pesa confirmation to your agent.</p>
-            <p>Regards,<br/>Lifestyle Properties Ltd.</p>
+            <p>Regards,<br/>Home Bridge Ltd.</p>
           `,
         })
       })

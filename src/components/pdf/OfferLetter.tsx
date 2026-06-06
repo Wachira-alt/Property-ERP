@@ -195,7 +195,7 @@ export function OfferLetterPDF({
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.companyName}>Lifestyle Properties Ltd.</Text>
+          <Text style={styles.companyName}>Home Bridge Ltd.</Text>
           <Text style={styles.companyTagline}>
             Premium Real Estate · Nairobi, Kenya
           </Text>
@@ -318,7 +318,7 @@ export function OfferLetterPDF({
               Authorized Signatory & Date
             </Text>
             <Text style={[styles.signatureLabel, { marginTop: 4 }]}>
-              Lifestyle Properties Ltd.
+              Home Bridge Ltd.
             </Text>
           </View>
         </View>
@@ -326,7 +326,7 @@ export function OfferLetterPDF({
         {/* Footer */}
         <Text style={styles.footer}>
           This document is computer generated and constitutes a valid letter of offer.
-          Lifestyle Properties Ltd. · P.O Box 00100, Nairobi, Kenya
+          Home Bridge Ltd. · P.O Box 00100, Nairobi, Kenya
         </Text>
       </Page>
     </Document>

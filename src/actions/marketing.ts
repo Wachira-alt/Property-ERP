@@ -195,7 +195,7 @@ function wrapInTemplate(body: string, subject: string): string {
 <body>
   <div class="wrapper">
     <div class="header">
-      <h1>Lifestyle Properties Ltd.</h1>
+      <h1>Home Bridge Ltd.</h1>
       <p>Premium Real Estate · Nairobi, Kenya</p>
     </div>
     <div class="body">
@@ -203,7 +203,7 @@ function wrapInTemplate(body: string, subject: string): string {
     </div>
     <div class="footer">
       <p>
-        Lifestyle Properties Ltd. · P.O Box 00100, Nairobi, Kenya<br>
+        Home Bridge Ltd. · P.O Box 00100, Nairobi, Kenya<br>
         You are receiving this email because you are a client or lead of ours.<br>
         <a href="mailto:${process.env.GMAIL_USER}">Contact us</a>
       </p>
