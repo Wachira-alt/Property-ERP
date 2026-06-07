@@ -24,10 +24,13 @@ export default async function DashboardLayout({
         <Sidebar user={user} />
 
         {/*
-          Desktop: pad left for sidebar (240px)
-          Mobile:  pad bottom for tab bar (56px + safe area)
+          Desktop: pad left for sidebar (240px), no top padding needed
+          Mobile:  pad top for status bar, pad bottom for tab bar + home indicator
         */}
-        <main className="md:pl-[240px] min-h-screen pb-[calc(56px+env(safe-area-inset-bottom))] md:pb-0">
+        <main
+          className="md:pl-[240px] min-h-screen pb-[calc(56px+env(safe-area-inset-bottom))] md:pb-0"
+          style={{ paddingTop: "env(safe-area-inset-top)" }}
+        >
           <PullToRefresh>
             <div className="max-w-[1280px] mx-auto px-4 py-6 md:px-6">
               {children}
