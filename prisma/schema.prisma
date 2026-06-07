@@ -23,10 +23,33 @@ model User {
   otpCodes         OtpCode[]
   sessions         UserSession[]
   loginLogs        LoginLog[]
+  auditLogs        AuditLog[]
 
   @@index([email])
   @@index([role])
   @@map("users")
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  action      String
+  entityType  String
+  entityId    String
+  actorId     String?
+  actorName   String
+  actorRole   String
+  metadata    Json?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  actor       User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId])
+  @@index([entityType])
+  @@index([entityId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
 }
 
 model OtpCode {

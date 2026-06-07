@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma"
 import { requireAuth } from "@/lib/auth"
 import { assertPermission } from "@/lib/permissions"
 import { isCompanyEmail } from "@/lib/auth"
+import { audit } from "@/lib/audit"
 import bcrypt from "bcryptjs"
 
 const COMPANY_DOMAIN = "lifestyleestates.co.ke"
@@ -50,11 +51,8 @@ export async function createUser(formData: FormData) {
 
   const { name, email, password, role } = parsed.data
 
-  // ── Domain restriction ──────────────────────────────────────────────────
   if (!isCompanyEmail(email)) {
-    return {
-      error: `Only @${COMPANY_DOMAIN} email addresses are allowed.`,
-    }
+    return { error: `Only @${COMPANY_DOMAIN} email addresses are allowed.` }
   }
 
   try {
@@ -65,8 +63,16 @@ export async function createUser(formData: FormData) {
 
     const hashedPassword = await bcrypt.hash(password, 12)
 
-    await prisma.user.create({
+    const user = await prisma.user.create({
       data: { name, email, password: hashedPassword, role },
+    })
+
+    await audit({
+      action:     "USER_CREATED",
+      entityType: "USER",
+      entityId:   user.id,
+      actor:      session,
+      metadata:   { name, email, role },
     })
 
     revalidatePath("/admin/team")
@@ -103,9 +109,22 @@ export async function updateUser(formData: FormData) {
       }
     }
 
-    await prisma.user.update({
-      where: { id: userId },
-      data:  { name, role },
+    const before = await prisma.user.findUnique({
+      where:  { id: userId },
+      select: { name: true, role: true },
+    })
+
+    await prisma.user.update({ where: { id: userId }, data: { name, role } })
+
+    await audit({
+      action:     "USER_UPDATED",
+      entityType: "USER",
+      entityId:   userId,
+      actor:      session,
+      metadata: {
+        before: { name: before?.name, role: before?.role },
+        after:  { name, role },
+      },
     })
 
     revalidatePath("/admin/team")
@@ -135,7 +154,6 @@ export async function deactivateUser(userId: string) {
       return { error: "You cannot deactivate your own account." }
     }
 
-    // Invalidate all sessions for this user
     await import("@/lib/auth").then(({ invalidateAllUserSessions }) =>
       invalidateAllUserSessions(userId)
     )
@@ -143,6 +161,18 @@ export async function deactivateUser(userId: string) {
     await prisma.user.update({
       where: { id: userId },
       data:  { isActive: false, deletedAt: new Date() },
+    })
+
+    await audit({
+      action:     "USER_DEACTIVATED",
+      entityType: "USER",
+      entityId:   userId,
+      actor:      session,
+      metadata: {
+        targetName:  targetUser?.name,
+        targetEmail: targetUser?.email,
+        targetRole:  targetUser?.role,
+      },
     })
 
     revalidatePath("/admin/team")
@@ -170,14 +200,18 @@ export async function resetPassword(formData: FormData) {
   try {
     const hashed = await bcrypt.hash(password, 12)
 
-    // Invalidate all existing sessions when password is reset
     await import("@/lib/auth").then(({ invalidateAllUserSessions }) =>
       invalidateAllUserSessions(userId)
     )
 
-    await prisma.user.update({
-      where: { id: userId },
-      data:  { password: hashed },
+    await prisma.user.update({ where: { id: userId }, data: { password: hashed } })
+
+    await audit({
+      action:     "USER_PASSWORD_RESET",
+      entityType: "USER",
+      entityId:   userId,
+      actor:      session,
+      metadata:   { resetById: session.id },
     })
 
     revalidatePath("/admin/team")
@@ -197,9 +231,7 @@ export async function getTeamMembers() {
       role:      true,
       isActive:  true,
       createdAt: true,
-      _count: {
-        select: { assignedContacts: true },
-      },
+      _count:    { select: { assignedContacts: true } },
     },
     orderBy: { createdAt: "asc" },
   })

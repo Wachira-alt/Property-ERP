@@ -6,6 +6,7 @@ import { z } from "zod"
 import { prisma } from "@/lib/prisma"
 import { requireAuth } from "@/lib/auth"
 import { assertPermission } from "@/lib/permissions"
+import { audit } from "@/lib/audit"
 
 const createLedgerEntrySchema = z.object({
   opportunityId: z.string().min(1),
@@ -20,8 +21,6 @@ const markAsPaidSchema = z.object({
   receiptUrl:     z.string().optional(),
   receiptFileKey: z.string().optional(),
 })
-
-// ─── Create Ledger Entry ──────────────────────────────────────────────────────
 
 export async function createLedgerEntry(formData: FormData) {
   const session = await requireAuth()
@@ -45,15 +44,10 @@ export async function createLedgerEntry(formData: FormData) {
       where: { id: opportunityId },
     })
 
-    if (!opportunity) {
-      return { error: "Opportunity not found." }
-    }
+    if (!opportunity)                 return { error: "Opportunity not found." }
+    if (opportunity.stage !== "AMBER") return { error: "Ledger entries can only be added during reservation stage." }
 
-    if (opportunity.stage !== "AMBER") {
-      return { error: "Ledger entries can only be added during reservation stage." }
-    }
-
-    await prisma.ledgerEntry.create({
+    const entry = await prisma.ledgerEntry.create({
       data: {
         opportunityId,
         description,
@@ -63,14 +57,25 @@ export async function createLedgerEntry(formData: FormData) {
       },
     })
 
+    await audit({
+      action:     "LEDGER_ENTRY_CREATED",
+      entityType: "LEDGER_ENTRY",
+      entityId:   entry.id,
+      actor:      session,
+      metadata: {
+        opportunityId,
+        description,
+        amount,
+        dueDate,
+      },
+    })
+
     revalidatePath("/contacts")
     return { success: true }
   } catch {
     return { error: "Failed to create ledger entry." }
   }
 }
-
-// ─── Delete Ledger Entry ──────────────────────────────────────────────────────
 
 export async function deleteLedgerEntry(entryId: string, contactId: string) {
   const session = await requireAuth()
@@ -88,14 +93,24 @@ export async function deleteLedgerEntry(entryId: string, contactId: string) {
 
     await prisma.ledgerEntry.delete({ where: { id: entryId } })
 
+    await audit({
+      action:     "LEDGER_ENTRY_DELETED",
+      entityType: "LEDGER_ENTRY",
+      entityId:   entryId,
+      actor:      session,
+      metadata: {
+        contactId,
+        description: entry.description,
+        amount:      Number(entry.amount),
+      },
+    })
+
     revalidatePath(`/contacts/${contactId}`)
     return { success: true }
   } catch {
     return { error: "Failed to delete ledger entry." }
   }
 }
-
-// ─── Mark as Paid ─────────────────────────────────────────────────────────────
 
 export async function markAsPaid(formData: FormData) {
   const session = await requireAuth()
@@ -114,15 +129,11 @@ export async function markAsPaid(formData: FormData) {
 
   const { entryId, paymentRef, receiptUrl, receiptFileKey } = parsed.data
 
-  // ── Step 1: Load entry and validate ───────────────────────────────────────
-  const entry = await prisma.ledgerEntry.findUnique({
-    where: { id: entryId },
-  })
+  const entry = await prisma.ledgerEntry.findUnique({ where: { id: entryId } })
 
   if (!entry)                  return { error: "Entry not found." }
   if (entry.status === "PAID") return { error: "Entry is already marked as paid." }
 
-  // ── Step 2: Mark as paid ──────────────────────────────────────────────────
   try {
     await prisma.ledgerEntry.update({
       where: { id: entryId },
@@ -139,15 +150,24 @@ export async function markAsPaid(formData: FormData) {
     return { error: "Failed to mark entry as paid." }
   }
 
-  // ── Step 3: Auto-Transition Logic ─────────────────────────────────────────
+  await audit({
+    action:     "PAYMENT_MARKED_PAID",
+    entityType: "LEDGER_ENTRY",
+    entityId:   entryId,
+    actor:      session,
+    metadata: {
+      opportunityId: entry.opportunityId,
+      description:   entry.description,
+      amount:        Number(entry.amount),
+      paymentRef,
+      hasReceipt:    !!receiptUrl,
+    },
+  })
+
   try {
     const opportunity = await prisma.opportunity.findUnique({
       where:   { id: entry.opportunityId },
-      include: {
-        documents:     true,
-        ledgerEntries: true,
-        unit:          true,
-      },
+      include: { documents: true, ledgerEntries: true, unit: true },
     })
 
     if (!opportunity) {
@@ -158,13 +178,10 @@ export async function markAsPaid(formData: FormData) {
     const docTypes     = opportunity.documents.map((d) => d.type)
     const requiredDocs = ["NATIONAL_ID", "KRA_PIN", "OFFER_LETTER_SIGNED", "BOOKING_RECEIPT"]
     const hasAllDocs   = requiredDocs.every((type) => docTypes.includes(type as any))
+    const ledgerTotal  = opportunity.ledgerEntries.reduce((sum, e) => sum + Number(e.amount), 0)
+    const isPriceMet   = ledgerTotal >= Number(opportunity.agreedPrice)
 
-    const ledgerTotal = opportunity.ledgerEntries.reduce(
-      (sum, e) => sum + Number(e.amount), 0
-    )
-    const isPriceMet  = ledgerTotal >= Number(opportunity.agreedPrice)
-
-    let currentStage  = opportunity.stage
+    let currentStage = opportunity.stage
 
     if (currentStage === "AMBER" && hasAllDocs && isPriceMet) {
       await prisma.$transaction([
@@ -177,6 +194,15 @@ export async function markAsPaid(formData: FormData) {
           data:  { status: "SOLD", reservedUntil: null },
         }),
       ])
+
+      await audit({
+        action:     "STAGE_MOVED_TO_CLOSED",
+        entityType: "OPPORTUNITY",
+        entityId:   opportunity.id,
+        actor:      session,
+        metadata:   { autoTransition: true, trigger: "ALL_PAYMENTS_RECEIVED" },
+      })
+
       currentStage = "CLOSED"
     }
 
@@ -189,6 +215,14 @@ export async function markAsPaid(formData: FormData) {
         where: { id: opportunity.id },
         data:  { stage: "PAST" },
       })
+
+      await audit({
+        action:     "STAGE_MOVED_TO_PAST",
+        entityType: "OPPORTUNITY",
+        entityId:   opportunity.id,
+        actor:      session,
+        metadata:   { autoTransition: true, trigger: "ALL_LEDGER_ENTRIES_PAID" },
+      })
     }
   } catch (err) {
     console.error("[markAsPaid] Auto-transition failed:", err)
@@ -199,8 +233,6 @@ export async function markAsPaid(formData: FormData) {
   return { success: true }
 }
 
-// ─── Get Ledger Summary ───────────────────────────────────────────────────────
-
 export async function getLedgerSummary(opportunityId: string) {
   const entries = await prisma.ledgerEntry.findMany({
     where:   { opportunityId },
@@ -208,15 +240,9 @@ export async function getLedgerSummary(opportunityId: string) {
   })
 
   const total   = entries.reduce((sum, e) => sum + Number(e.amount), 0)
-  const paid    = entries
-    .filter((e) => e.status === "PAID")
-    .reduce((sum, e) => sum + Number(e.amount), 0)
-  const pending = entries
-    .filter((e) => e.status === "PENDING")
-    .reduce((sum, e) => sum + Number(e.amount), 0)
-  const overdue = entries
-    .filter((e) => e.status === "OVERDUE")
-    .reduce((sum, e) => sum + Number(e.amount), 0)
+  const paid    = entries.filter((e) => e.status === "PAID").reduce((sum, e) => sum + Number(e.amount), 0)
+  const pending = entries.filter((e) => e.status === "PENDING").reduce((sum, e) => sum + Number(e.amount), 0)
+  const overdue = entries.filter((e) => e.status === "OVERDUE").reduce((sum, e) => sum + Number(e.amount), 0)
 
   return { entries, total, paid, pending, overdue }
 }

@@ -23,6 +23,7 @@ import type { SessionUser } from "@/types/auth"
 import type { Action } from "@/lib/permissions"
 import { canPerform } from "@/lib/permissions"
 import { LayoutDashboard } from "lucide-react"
+import { Shield } from "lucide-react"
 
 type NavItem = {
   label: string
@@ -45,8 +46,24 @@ const NAV_ITEMS: NavItem[] = [
 ]
 
 const ADMIN_ITEMS: NavItem[] = [
-  { label: "Team",     href: "/admin/team",     icon: UserCog,  requiredAction: "MANAGE_TEAM" },
-  { label: "Projects", href: "/admin/projects", icon: Settings, requiredAction: "MANAGE_INVENTORY" },
+  {
+    label:          "Team",
+    href:           "/admin/team",
+    icon:           UserCog,
+    requiredAction: "MANAGE_TEAM",
+  },
+  {
+    label:          "Projects",
+    href:           "/admin/projects",
+    icon:           Settings,
+    requiredAction: "MANAGE_INVENTORY",
+  },
+  {
+    label:          "Audit Log",
+    href:           "/admin/audit",
+    icon:           Shield,
+    requiredAction: "MANAGE_TEAM",
+  },
 ]
 
 function NavLink({ item, onClick }: { item: NavItem; onClick?: () => void }) {

@@ -6,8 +6,7 @@ import { z } from "zod"
 import { prisma } from "@/lib/prisma"
 import { requireAuth } from "@/lib/auth"
 import { assertPermission } from "@/lib/permissions"
-
-// ─── Schemas ──────────────────────────────────────────────────────────────────
+import { audit } from "@/lib/audit"
 
 const createContactSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -29,8 +28,6 @@ const addNoteSchema = z.object({
   content:   z.string().min(1, "Note cannot be empty"),
 })
 
-// ─── Mutations ────────────────────────────────────────────────────────────────
-
 export async function createContact(formData: FormData) {
   const session = await requireAuth()
   assertPermission(session.role, "CREATE_CONTACT")
@@ -49,7 +46,6 @@ export async function createContact(formData: FormData) {
     return { error: parsed.error.issues[0].message }
   }
 
-  // If a unit was selected, verify it is still available
   if (parsed.data.unitId) {
     const unit = await prisma.unit.findUnique({
       where: { id: parsed.data.unitId },
@@ -79,6 +75,21 @@ export async function createContact(formData: FormData) {
       },
     })
 
+    await audit({
+      action:     "CONTACT_CREATED",
+      entityType: "CONTACT",
+      entityId:   contact.id,
+      actor:      session,
+      metadata: {
+        name:      `${parsed.data.firstName} ${parsed.data.lastName}`,
+        phone:     parsed.data.phone,
+        email:     parsed.data.email,
+        projectId: parsed.data.projectId,
+        agentId:   parsed.data.agentId,
+        unitId:    parsed.data.unitId,
+      },
+    })
+
     revalidatePath("/contacts")
     return { success: true, contactId: contact.id }
   } catch {
@@ -102,9 +113,7 @@ export async function assignUnit(formData: FormData) {
   const { contactId, unitId } = parsed.data
 
   try {
-    const unit = await prisma.unit.findUnique({
-      where: { id: unitId },
-    })
+    const unit = await prisma.unit.findUnique({ where: { id: unitId } })
 
     if (!unit || unit.status !== "AVAILABLE") {
       return { error: "This unit is no longer available." }
@@ -118,9 +127,23 @@ export async function assignUnit(formData: FormData) {
       return { error: "No opportunity found for this contact." }
     }
 
+    const previousUnitId = opportunity.unitId
+
     await prisma.opportunity.update({
       where: { contactId },
       data:  { unitId },
+    })
+
+    await audit({
+      action:     "UNIT_ASSIGNED",
+      entityType: "CONTACT",
+      entityId:   contactId,
+      actor:      session,
+      metadata: {
+        unitId,
+        unitName:        unit.name,
+        previousUnitId,
+      },
     })
 
     revalidatePath(`/contacts/${contactId}`)
@@ -143,11 +166,22 @@ export async function addNote(formData: FormData) {
   }
 
   try {
-    await prisma.note.create({
+    const note = await prisma.note.create({
       data: {
         contactId: parsed.data.contactId,
         authorId:  session.id,
         content:   parsed.data.content,
+      },
+    })
+
+    await audit({
+      action:     "NOTE_ADDED",
+      entityType: "CONTACT",
+      entityId:   parsed.data.contactId,
+      actor:      session,
+      metadata: {
+        noteId:  note.id,
+        preview: parsed.data.content.slice(0, 100),
       },
     })
 
@@ -157,8 +191,6 @@ export async function addNote(formData: FormData) {
     return { error: "Failed to add note." }
   }
 }
-
-// ─── Queries ──────────────────────────────────────────────────────────────────
 
 export async function getContacts(search?: string, stage?: string) {
   return prisma.contact.findMany({
@@ -208,7 +240,6 @@ export async function getContactById(id: string) {
         include: { author: { select: { id: true, name: true } } },
         orderBy: { createdAt: "desc" },
       },
-      
       opportunity: {
         include: {
           unit: {

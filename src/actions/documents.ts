@@ -5,10 +5,11 @@ import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { prisma } from "@/lib/prisma"
 import { requireAuth } from "@/lib/auth"
+import { audit } from "@/lib/audit"
 
 const saveDocumentSchema = z.object({
   opportunityId: z.string().min(1),
-  type:          z.enum([
+  type: z.enum([
     "NATIONAL_ID",
     "KRA_PIN",
     "OFFER_LETTER_UNSIGNED",
@@ -22,12 +23,12 @@ const saveDocumentSchema = z.object({
 
 export async function saveDocumentRecord(data: {
   opportunityId: string
-  type: string
-  fileName: string
-  fileUrl: string
-  fileKey: string
+  type:          string
+  fileName:      string
+  fileUrl:       string
+  fileKey:       string
 }) {
-  await requireAuth()
+  const session = await requireAuth()
 
   const parsed = saveDocumentSchema.safeParse(data)
   if (!parsed.success) {
@@ -35,7 +36,6 @@ export async function saveDocumentRecord(data: {
   }
 
   try {
-    // Replace existing document of same type
     await prisma.document.deleteMany({
       where: {
         opportunityId: parsed.data.opportunityId,
@@ -43,7 +43,19 @@ export async function saveDocumentRecord(data: {
       },
     })
 
-    await prisma.document.create({ data: parsed.data })
+    const doc = await prisma.document.create({ data: parsed.data })
+
+    await audit({
+      action:     "DOCUMENT_UPLOADED",
+      entityType: "DOCUMENT",
+      entityId:   doc.id,
+      actor:      session,
+      metadata: {
+        opportunityId: parsed.data.opportunityId,
+        type:          parsed.data.type,
+        fileName:      parsed.data.fileName,
+      },
+    })
 
     revalidatePath("/contacts")
     return { success: true }
@@ -53,10 +65,25 @@ export async function saveDocumentRecord(data: {
 }
 
 export async function deleteDocument(documentId: string, contactId: string) {
-  await requireAuth()
+  const session = await requireAuth()
 
   try {
+    const doc = await prisma.document.findUnique({ where: { id: documentId } })
+
     await prisma.document.delete({ where: { id: documentId } })
+
+    await audit({
+      action:     "DOCUMENT_DELETED",
+      entityType: "DOCUMENT",
+      entityId:   documentId,
+      actor:      session,
+      metadata: {
+        contactId,
+        type:     doc?.type,
+        fileName: doc?.fileName,
+      },
+    })
+
     revalidatePath(`/contacts/${contactId}`)
     return { success: true }
   } catch {
