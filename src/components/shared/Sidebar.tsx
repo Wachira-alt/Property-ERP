@@ -13,30 +13,30 @@ import {
   Settings,
   UserCog,
   LogOut,
-  Menu,
-  X,
   ChevronRight,
+  LayoutDashboard,
+  // Shield,
+  MoreHorizontal,
+  X,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import type { SessionUser } from "@/types/auth"
 import type { Action } from "@/lib/permissions"
 import { canPerform } from "@/lib/permissions"
-import { LayoutDashboard } from "lucide-react"
-// import { Shield } from "lucide-react"
 
 type NavItem = {
-  label: string
-  href: string
-  icon: React.ElementType
+  label:           string
+  href:            string
+  icon:            React.ElementType
   requiredAction?: Action
 }
 
 const NAV_ITEMS: NavItem[] = [
   {
-    label: "Dashboard",
-    href:  "/dashboard",
-    icon:  LayoutDashboard,
+    label:          "Dashboard",
+    href:           "/dashboard",
+    icon:           LayoutDashboard,
     requiredAction: "EXTEND_RESERVATION",
   },
   { label: "Contacts",  href: "/contacts",  icon: Users },
@@ -66,10 +66,11 @@ const ADMIN_ITEMS: NavItem[] = [
   // },
 ]
 
+// ── Desktop nav link ──────────────────────────────────────────────────────────
 function NavLink({ item, onClick }: { item: NavItem; onClick?: () => void }) {
   const pathname = usePathname()
   const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
-  const Icon = item.icon
+  const Icon     = item.icon
 
   return (
     <Link
@@ -95,8 +96,9 @@ function NavLink({ item, onClick }: { item: NavItem; onClick?: () => void }) {
   )
 }
 
-function SidebarContent({ user, onNavigate }: { user: SessionUser; onNavigate?: () => void }) {
-  const router = useRouter()
+// ── Desktop sidebar content ───────────────────────────────────────────────────
+function SidebarContent({ user }: { user: SessionUser }) {
+  const router                      = useRouter()
   const [loggingOut, setLoggingOut] = useState(false)
 
   const visibleNav   = NAV_ITEMS.filter((item) => !item.requiredAction || canPerform(user.role, item.requiredAction))
@@ -139,10 +141,10 @@ function SidebarContent({ user, onNavigate }: { user: SessionUser; onNavigate?: 
         </div>
       </div>
 
-      {/* Main Nav */}
+      {/* Main nav */}
       <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
         {visibleNav.map((item) => (
-          <NavLink key={item.href} item={item} onClick={onNavigate} />
+          <NavLink key={item.href} item={item} />
         ))}
 
         {visibleAdmin.length > 0 && (
@@ -153,17 +155,14 @@ function SidebarContent({ user, onNavigate }: { user: SessionUser; onNavigate?: 
               </p>
             </div>
             {visibleAdmin.map((item) => (
-              <NavLink key={item.href} item={item} onClick={onNavigate} />
+              <NavLink key={item.href} item={item} />
             ))}
           </>
         )}
       </nav>
 
-      {/* User footer — safe area bottom so home indicator doesn't cover it */}
-      <div
-        className="border-t border-[#21262d] px-3 py-3 space-y-0.5"
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}
-      >
+      {/* User footer */}
+      <div className="border-t border-[#21262d] px-3 py-3 space-y-0.5">
         <div className="flex items-center gap-3 px-3 py-2 rounded-md">
           <div className="w-6 h-6 rounded-full bg-[#1f6feb] flex items-center justify-center shrink-0">
             <span className="text-[11px] font-semibold text-white">
@@ -189,86 +188,231 @@ function SidebarContent({ user, onNavigate }: { user: SessionUser; onNavigate?: 
   )
 }
 
-export function Sidebar({ user }: { user: SessionUser }) {
-  const [mobileOpen, setMobileOpen] = useState(false)
+// ── Mobile bottom tab bar ─────────────────────────────────────────────────────
+function BottomTabBar({ user }: { user: SessionUser }) {
+  const pathname                    = usePathname()
+  const router                      = useRouter()
+  const [moreOpen, setMoreOpen]     = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
+  const [confirmLogout, setConfirmLogout] = useState(false)
+
+  const visibleNav = NAV_ITEMS.filter(
+    (item) => !item.requiredAction || canPerform(user.role, item.requiredAction)
+  ).slice(0, 4)
+
+  const visibleAdmin = ADMIN_ITEMS.filter(
+    (item) => !item.requiredAction || canPerform(user.role, item.requiredAction)
+  )
+
+  const isMoreActive =
+    !visibleNav.some((item) => pathname === item.href || pathname.startsWith(item.href + "/")) ||
+    moreOpen
+
+  async function handleLogout() {
+    setLoggingOut(true)
+    try {
+      await fetch("/api/auth", { method: "DELETE" })
+      router.push("/login")
+      router.refresh()
+    } catch {
+      toast.error("Failed to log out")
+      setLoggingOut(false)
+      setConfirmLogout(false)
+    }
+  }
+
+  function handleTabTap() {
+    // Haptic feedback — subtle, 10ms, barely perceptible
+    navigator.vibrate?.(10)
+  }
 
   return (
     <>
-      {/* ── Desktop sidebar ─────────────────────────────── */}
-      <aside
-        className="hidden md:flex fixed left-0 top-0 h-screen w-[240px] flex-col bg-[#010409] border-r border-[#21262d] z-40"
-        style={{
-          paddingTop: 'env(safe-area-inset-top)',
-          paddingBottom: 'env(safe-area-inset-bottom)',
-        }}
+      {/* Bottom tab bar */}
+      <nav
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#010409]/95 backdrop-blur-md border-t border-[#21262d]"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
+        <div className="flex items-stretch">
+          {visibleNav.map((item) => {
+            const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
+            const Icon     = item.icon
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => { handleTabTap(); setMoreOpen(false) }}
+                className="flex-1 flex flex-col items-center justify-center gap-1 py-2 min-h-[56px] transition-colors active:bg-[#21262d]/60"
+              >
+                {/* Active pill */}
+                <div className={cn(
+                  "flex items-center justify-center w-12 h-7 rounded-full transition-all duration-200",
+                  isActive ? "bg-[#1f6feb]/20" : "bg-transparent"
+                )}>
+                  <Icon
+                    size={20}
+                    className={cn(
+                      "transition-colors duration-200",
+                      isActive ? "text-[#58a6ff]" : "text-[#484f58]"
+                    )}
+                  />
+                </div>
+                <span className={cn(
+                  "text-[10px] font-medium transition-colors duration-200",
+                  isActive ? "text-[#58a6ff]" : "text-[#484f58]"
+                )}>
+                  {item.label}
+                </span>
+              </Link>
+            )
+          })}
+
+          {/* More tab */}
+          <button
+            onClick={() => { handleTabTap(); setMoreOpen(true) }}
+            className="flex-1 flex flex-col items-center justify-center gap-1 py-2 min-h-[56px] transition-colors active:bg-[#21262d]/60"
+          >
+            <div className={cn(
+              "flex items-center justify-center w-12 h-7 rounded-full transition-all duration-200",
+              moreOpen ? "bg-[#1f6feb]/20" : "bg-transparent"
+            )}>
+              <MoreHorizontal
+                size={20}
+                className={cn(
+                  "transition-colors duration-200",
+                  moreOpen ? "text-[#58a6ff]" : "text-[#484f58]"
+                )}
+              />
+            </div>
+            <span className={cn(
+              "text-[10px] font-medium transition-colors duration-200",
+              moreOpen ? "text-[#58a6ff]" : "text-[#484f58]"
+            )}>
+              More
+            </span>
+          </button>
+        </div>
+      </nav>
+
+      {/* More — bottom sheet */}
+      {moreOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="md:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+            onClick={() => setMoreOpen(false)}
+          />
+
+          {/* Sheet */}
+          <div
+            className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#161b22] rounded-t-2xl border-t border-[#30363d] animate-in slide-in-from-bottom duration-300"
+            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)" }}
+          >
+            {/* Handle */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 rounded-full bg-[#30363d]" />
+            </div>
+
+            {/* User info */}
+            <div className="px-4 py-3 border-b border-[#21262d]">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-[#1f6feb] flex items-center justify-center shrink-0">
+                  <span className="text-sm font-bold text-white">
+                    {user.name.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-[#e6edf3] truncate">{user.name}</p>
+                  <p className="text-xs text-[#7d8590] truncate">{user.email}</p>
+                  <p className="text-[11px] text-[#484f58] capitalize mt-0.5">
+                    {user.role.toLowerCase().replace("_", " ")}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Admin nav items */}
+            {visibleAdmin.length > 0 && (
+              <div className="px-3 py-2">
+                <p className="text-[11px] font-medium text-[#484f58] uppercase tracking-wider px-3 py-2">
+                  Admin
+                </p>
+                {visibleAdmin.map((item) => {
+                  const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
+                  const Icon     = item.icon
+
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMoreOpen(false)}
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-3 rounded-xl transition-colors active:bg-[#21262d]",
+                        isActive ? "bg-[#21262d] text-[#e6edf3]" : "text-[#7d8590]"
+                      )}
+                    >
+                      <Icon size={18} className={isActive ? "text-[#58a6ff]" : "text-[#484f58]"} />
+                      <span className="text-sm font-medium">{item.label}</span>
+                      <ChevronRight size={14} className="ml-auto text-[#484f58]" />
+                    </Link>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Divider */}
+            <div className="mx-4 border-t border-[#21262d]" />
+
+            {/* Sign out */}
+            <div className="px-3 py-2">
+              {confirmLogout ? (
+                <div className="px-3 py-3 space-y-3">
+                  <p className="text-sm text-[#e6edf3] font-medium">Sign out of Home Bridge?</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setConfirmLogout(false)}
+                      className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-[#21262d] text-[#7d8590] active:opacity-70 transition-opacity"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleLogout}
+                      disabled={loggingOut}
+                      className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-[#f85149]/10 text-[#f85149] active:opacity-70 transition-opacity disabled:opacity-40"
+                    >
+                      {loggingOut ? "Signing out…" : "Sign out"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmLogout(true)}
+                  className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-[#f85149] active:bg-[#21262d] transition-colors"
+                >
+                  <LogOut size={18} />
+                  <span className="text-sm font-medium">Sign out</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </>
+  )
+}
+
+// ── Exports ───────────────────────────────────────────────────────────────────
+export function Sidebar({ user }: { user: SessionUser }) {
+  return (
+    <>
+      {/* Desktop — fixed left sidebar */}
+      <aside className="hidden md:flex fixed left-0 top-0 h-screen w-[240px] flex-col bg-[#010409] border-r border-[#21262d] z-40">
         <SidebarContent user={user} />
       </aside>
 
-      {/* ── Mobile top bar ──────────────────────────────── */}
-      <div
-        className="md:hidden fixed top-0 left-0 right-0 z-40 bg-[#010409] border-b border-[#21262d]"
-        style={{ paddingTop: 'env(safe-area-inset-top)' }}
-      >
-        <div className="flex items-center justify-between px-4 h-14">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-md overflow-hidden bg-white flex items-center justify-center shrink-0">
-              <Image
-                src="/company_lo.png"
-                alt="Home Bridge"
-                width={24}
-                height={24}
-                className="object-contain"
-              />
-            </div>
-            <span className="text-sm font-semibold text-[#e6edf3]">Home Bridge</span>
-          </div>
-          <button
-            onClick={() => setMobileOpen(true)}
-            className="p-1.5 rounded-md text-[#7d8590] hover:text-[#e6edf3] hover:bg-[#21262d] transition-colors"
-            aria-label="Open menu"
-          >
-            <Menu size={20} />
-          </button>
-        </div>
-      </div>
-
-      {/* Mobile top bar spacer — h-14 + status bar height */}
-      <div
-        className="md:hidden h-14"
-        style={{ marginTop: 'env(safe-area-inset-top)' }}
-      />
-
-      {/* ── Mobile drawer overlay ───────────────────────── */}
-      {mobileOpen && (
-        <div className="md:hidden fixed inset-0 z-50 flex" role="dialog" aria-modal="true">
-          <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={() => setMobileOpen(false)}
-          />
-          <div
-            className="relative w-[240px] h-full bg-[#010409] border-r border-[#21262d] flex flex-col"
-            style={{
-              paddingTop: 'env(safe-area-inset-top)',
-              paddingBottom: 'env(safe-area-inset-bottom)',
-            }}
-          >
-            <div
-              className="absolute right-3"
-              style={{ top: 'calc(env(safe-area-inset-top) + 12px)' }}
-            >
-              <button
-                onClick={() => setMobileOpen(false)}
-                className="p-1.5 rounded-md text-[#7d8590] hover:text-[#e6edf3] hover:bg-[#21262d] transition-colors"
-                aria-label="Close menu"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <SidebarContent user={user} onNavigate={() => setMobileOpen(false)} />
-          </div>
-        </div>
-      )}
+      {/* Mobile — bottom tab bar + more sheet */}
+      <BottomTabBar user={user} />
     </>
   )
 }
