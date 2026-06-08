@@ -15,7 +15,7 @@ import {
   LogOut,
   ChevronRight,
   LayoutDashboard,
-  // Shield,
+  Shield,
   MoreHorizontal,
   X,
 } from "lucide-react"
@@ -40,7 +40,7 @@ const NAV_ITEMS: NavItem[] = [
     requiredAction: "EXTEND_RESERVATION",
   },
   { label: "Contacts",  href: "/contacts",  icon: Users },
-  { label: "Inventory", href: "/inventory", icon: LayoutGrid, requiredAction: "MANAGE_INVENTORY" },
+  { label: "Inventory", href: "/inventory", icon: LayoutGrid, requiredAction: "VIEW_INVENTORY" },
   { label: "Finance",   href: "/finance",   icon: Wallet,     requiredAction: "VIEW_FINANCE" },
   { label: "Marketing", href: "/marketing", icon: Megaphone,  requiredAction: "SEND_CAMPAIGN" },
 ]
@@ -58,12 +58,12 @@ const ADMIN_ITEMS: NavItem[] = [
     icon:           Settings,
     requiredAction: "MANAGE_INVENTORY",
   },
-  // {
-  //   label:          "Audit Log",
-  //   href:           "/admin/audit",
-  //   icon:           Shield,
-  //   requiredAction: "MANAGE_TEAM",
-  // },
+  {
+    label:          "Audit Log",
+    href:           "/admin/audit",
+    icon:           Shield,
+    requiredAction: "MANAGE_TEAM",
+  },
 ]
 
 // ── Desktop nav link ──────────────────────────────────────────────────────────
