@@ -159,6 +159,7 @@ model Contact {
   agent       User         @relation("AgentContacts", fields: [agentId], references: [id])
   project     Project      @relation(fields: [projectId], references: [id])
   notes       Note[]
+  contactDocuments ContactDocument[]
   opportunity Opportunity?
 
   @@index([projectId])
@@ -320,4 +321,20 @@ enum DocumentType {
   OFFER_LETTER_UNSIGNED
   OFFER_LETTER_SIGNED
   BOOKING_RECEIPT
+}
+model ContactDocument {
+  id          String   @id @default(cuid())
+  contactId   String
+  fileName    String
+  fileUrl     String
+  fileKey     String
+  mimeType    String
+  uploadedBy  String
+  uploaderName String
+  createdAt   DateTime @default(now())
+
+  contact     Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
+  @@map("contact_documents")
 }

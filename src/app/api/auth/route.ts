@@ -25,31 +25,31 @@ const otpSchema = z.object({
 })
 
 // ── In-memory rate limiter ────────────────────────────────────────────────────
-const attempts = new Map<string, { count: number; resetAt: number }>()
+// const attempts = new Map<string, { count: number; resetAt: number }>()
 
-function isRateLimited(ip: string): boolean {
-  const now    = Date.now()
-  const record = attempts.get(ip)
-  if (!record || now > record.resetAt) {
-    attempts.set(ip, { count: 1, resetAt: now + 15 * 60 * 1000 })
-    return false
-  }
-  if (record.count >= 5) return true
-  record.count++
-  return false
-}
+// function isRateLimited(ip: string): boolean {
+//   const now    = Date.now()
+//   const record = attempts.get(ip)
+//   if (!record || now > record.resetAt) {
+//     attempts.set(ip, { count: 1, resetAt: now + 15 * 60 * 1000 })
+//     return false
+//   }
+//   if (record.count >= 5) return true
+//   record.count++
+//   return false
+// }
 
 // ── Step 1: Password verification → send OTP ──────────────────────────────────
 export async function POST(req: NextRequest) {
   const ip        = req.headers.get("x-forwarded-for") ?? "unknown"
   const userAgent = req.headers.get("user-agent") ?? "unknown"
 
-  if (isRateLimited(ip)) {
-    return NextResponse.json(
-      { error: "Too many login attempts. Try again in 15 minutes." },
-      { status: 429 }
-    )
-  }
+  // if (isRateLimited(ip)) {
+  //   return NextResponse.json(
+  //     { error: "Too many login attempts. Try again in 15 minutes." },
+  //     { status: 429 }
+  //   )
+  // }
 
   const body   = await req.json().catch(() => null)
   const parsed = loginSchema.safeParse(body)

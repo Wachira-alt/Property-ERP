@@ -22,6 +22,7 @@ import {
 import Link from "next/link"
 import { FinalizeSaleBtn } from "./_components/FinalizeSaleBtn"
 import { formatCurrency }  from "@/lib/utils"
+import { ContactVault } from "./_components/ContactVault"
 
 type Props = {
   params: Promise<{ id: string }>
@@ -263,19 +264,40 @@ export default async function ContactDetailPage({ params }: Props) {
         </div>
 
         {/* Notes panel — 1/3 width */}
-        <div className="lg:col-span-1">
-          <div className="border border-[#30363d] rounded-lg bg-[#161b22] overflow-hidden">
-            <div className="px-4 py-3.5 border-b border-[#30363d]">
-              <h2 className="text-sm font-medium text-[#e6edf3]">Activity</h2>
-            </div>
-            <div className="p-4">
-              <AddNoteForm
-                contactId={contact.id}
-                notes={contact.notes}
-              />
-            </div>
-          </div>
-        </div>
+        {/* Right column — Notes + Vault */}
+<div className="lg:col-span-1 space-y-4">
+  {/* Activity / Notes */}
+  <div className="border border-[#30363d] rounded-lg bg-[#161b22] overflow-hidden">
+    <div className="px-4 py-3.5 border-b border-[#30363d]">
+      <h2 className="text-sm font-medium text-[#e6edf3]">Activity</h2>
+    </div>
+    <div className="p-4">
+      <AddNoteForm
+        contactId={contact.id}
+        notes={contact.notes}
+      />
+    </div>
+  </div>
+
+  {/* Document Vault */}
+  <div className="border border-[#30363d] rounded-lg bg-[#161b22] overflow-hidden">
+    <div className="px-4 py-3.5 border-b border-[#30363d]">
+      <h2 className="text-sm font-medium text-[#e6edf3]">Documents</h2>
+      <p className="text-[11px] text-[#484f58] mt-0.5">
+        General files for this contact
+      </p>
+    </div>
+    <div className="p-4">
+      <ContactVault
+        contactId={contact.id}
+        documents={contact.contactDocuments ?? []}
+        canDelete={
+          session.role === "ADMIN" || session.role === "GENERAL_MANAGER"
+        }
+      />
+    </div>
+  </div>
+</div>
       </div>
     </div>
   )

@@ -232,27 +232,30 @@ export async function getContactById(id: string) {
   if (opp?.unitId) await checkAndExpireReservation(opp.unitId)
 
   return prisma.contact.findUnique({
-    where: { id, deletedAt: null },
-    include: {
-      project: { select: { id: true, name: true } },
-      agent:   { select: { id: true, name: true, role: true } },
-      notes: {
-        include: { author: { select: { id: true, name: true } } },
-        orderBy: { createdAt: "desc" },
-      },
-      opportunity: {
-        include: {
-          unit: {
-            include: {
-              unitType: {
-                include: { project: { select: { id: true, name: true } } },
-              },
+  where: { id, deletedAt: null },
+  include: {
+    project: { select: { id: true, name: true } },
+    agent:   { select: { id: true, name: true, role: true } },
+    notes: {
+      include: { author: { select: { id: true, name: true } } },
+      orderBy: { createdAt: "desc" },
+    },
+    contactDocuments: {                          
+      orderBy: { createdAt: "desc" },
+    },
+    opportunity: {
+      include: {
+        unit: {
+          include: {
+            unitType: {
+              include: { project: { select: { id: true, name: true } } },
             },
           },
-          ledgerEntries: { orderBy: { dueDate: "asc" } },
-          documents:     { orderBy: { uploadedAt: "desc" } },
         },
+        ledgerEntries: { orderBy: { dueDate: "asc" } },
+        documents:     { orderBy: { uploadedAt: "desc" } },
       },
     },
-  })
+  },
+})
 }

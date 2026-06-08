@@ -90,3 +90,81 @@ export async function deleteDocument(documentId: string, contactId: string) {
     return { error: "Failed to delete document." }
   }
 }
+export async function uploadContactDocument(data: {
+  contactId:   string
+  fileName:    string
+  fileUrl:     string
+  fileKey:     string
+  mimeType:    string
+}) {
+  const session = await requireAuth()
+
+  try {
+    const doc = await prisma.contactDocument.create({
+      data: {
+        contactId:    data.contactId,
+        fileName:     data.fileName,
+        fileUrl:      data.fileUrl,
+        fileKey:      data.fileKey,
+        mimeType:     data.mimeType,
+        uploadedBy:   session.id,
+        uploaderName: session.name,
+      },
+    })
+
+    await audit({
+      action:     "DOCUMENT_UPLOADED",
+      entityType: "CONTACT",
+      entityId:   data.contactId,
+      actor:      session,
+      metadata: {
+        documentId: doc.id,
+        fileName:   data.fileName,
+        vault:      true,
+      },
+    })
+
+    revalidatePath(`/contacts/${data.contactId}`)
+    return { success: true, document: doc }
+  } catch {
+    return { error: "Failed to upload document." }
+  }
+}
+
+export async function deleteContactDocument(
+  documentId: string,
+  contactId:  string
+) {
+  const session = await requireAuth()
+
+  if (session.role !== "ADMIN" && session.role !== "GENERAL_MANAGER") {
+    return { error: "Only Admin or General Manager can delete documents." }
+  }
+
+  try {
+    const doc = await prisma.contactDocument.findUnique({
+      where: { id: documentId },
+    })
+
+    if (!doc) return { error: "Document not found." }
+
+    await prisma.contactDocument.delete({ where: { id: documentId } })
+
+    await audit({
+      action:     "DOCUMENT_DELETED",
+      entityType: "CONTACT",
+      entityId:   contactId,
+      actor:      session,
+      metadata: {
+        documentId,
+        fileName: doc.fileName,
+        vault:    true,
+      },
+    })
+
+    revalidatePath(`/contacts/${contactId}`)
+    return { success: true }
+  } catch {
+    return { error: "Failed to delete document." }
+  }
+}
