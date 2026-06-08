@@ -15,7 +15,7 @@ import {
   LogOut,
   ChevronRight,
   LayoutDashboard,
-  Shield,
+  // Shield,
   MoreHorizontal,
   X,
 } from "lucide-react"
@@ -58,12 +58,12 @@ const ADMIN_ITEMS: NavItem[] = [
     icon:           Settings,
     requiredAction: "MANAGE_INVENTORY",
   },
-  {
-    label:          "Audit Log",
-    href:           "/admin/audit",
-    icon:           Shield,
-    requiredAction: "MANAGE_TEAM",
-  },
+  // {
+  //   label:          "Audit Log",
+  //   href:           "/admin/audit",
+  //   icon:           Shield,
+  //   requiredAction: "MANAGE_TEAM",
+  // },
 ]
 
 // ── Desktop nav link ──────────────────────────────────────────────────────────
