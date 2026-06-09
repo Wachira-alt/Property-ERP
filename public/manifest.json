@@ -1,6 +1,6 @@
 {
-  "name": "Property ERP",
-  "short_name": "PropertyERP",
+  "name": "Home Bridge",
+  "short_name": "Home Bridge",
   "description": "Real estate sales pipeline management",
   "start_url": "/contacts",
   "display": "standalone",
